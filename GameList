@@ -1,0 +1,9 @@
+return {
+    isKeylessMode = true,
+
+    youtubeLink = "https://youtube.com/shorts/65BZKDTybMk?si=W_CQ4AUWqR8yh5bh",
+
+    keyless = {
+        [6447798030] = "FunkyFriday"
+    },
+}

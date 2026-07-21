@@ -1262,36 +1262,37 @@ function Speed_Library:CreateWindow(Config)
 
 
   local DropShadow = Custom:Create("ImageLabel", {
-    Image = "",
-    ImageColor3 = Color3.fromRGB(15, 15, 15),
-    ImageTransparency = 0.5,
+    Image = "rbxassetid://6015897843",
+    ImageColor3 = Custom.ColorRGB,
+    ImageTransparency = 0.6,
     ScaleType = Enum.ScaleType.Slice,
     SliceCenter = Rect.new(49, 49, 450, 450),
     AnchorPoint = Vector2.new(0.5, 0.5),
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
     Position = UDim2.new(0.5, 0, 0.5, 0),
-    Size = SizeUi,
+    Size = UDim2.new(1, 35, 1, 35),
     ZIndex = 0,
     Name = "DropShadow"
   }, DropShadowHolder)
 
   local Main = Custom:Create("Frame", {
     AnchorPoint = Vector2.new(0.5, 0.5),
-    BackgroundColor3 = Color3.fromRGB(15, 15, 15),
-    BackgroundTransparency = 0.1,
+    BackgroundColor3 = Color3.fromRGB(12, 12, 12),
+    BackgroundTransparency = 0.15,
     BorderColor3 = Color3.fromRGB(30, 30, 30),
     BorderSizePixel = 0,
     Position = UDim2.new(0.5, 0, 0.5, 0),
     Size = SizeUi,
     Name = "Main"
-  }, DropShadow)
+  }, DropShadowHolder)
 
-  Custom:Create("UICorner", {}, Main)
+  Custom:Create("UICorner", { CornerRadius = UDim.new(0, 8) }, Main)
 
   Custom:Create("UIStroke", {
-    Color = Color3.fromRGB(50, 50, 50),
-    Thickness = 1.6
+    Color = Custom.ColorRGB,
+    Transparency = 0.3,
+    Thickness = 1.2
   }, Main)
 
   local Top = Custom:Create("Frame", {
@@ -2335,6 +2336,14 @@ function Speed_Library:CreateWindow(Config)
           Size = UDim2.new(1, 0, 1, 0)
         }, FeatureFrame1)
 
+        ButtonButton.MouseEnter:Connect(function()
+            TweenService:Create(Button, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.1, BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
+        end)
+        
+        ButtonButton.MouseLeave:Connect(function()
+            TweenService:Create(Button, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.2, BackgroundColor3 = Color3.fromRGB(28, 28, 28)}):Play()
+        end)
+
         ButtonButton.Activated:Connect(function()
 					CircleClick(ButtonButton, Player:GetMouse().X, Player:GetMouse().Y)
 
@@ -2475,6 +2484,14 @@ function Speed_Library:CreateWindow(Config)
           TweenService:Create(FeatureFrame2, tweenInfo, {BackgroundColor3 = FrameColor, BackgroundTransparency = FrameTransparency}):Play()
         end
       
+        ToggleButton.MouseEnter:Connect(function()
+            TweenService:Create(Toggle, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.1, BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
+        end)
+
+        ToggleButton.MouseLeave:Connect(function()
+            TweenService:Create(Toggle, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.2, BackgroundColor3 = Color3.fromRGB(28, 28, 28)}):Play()
+        end)
+
         ToggleButton.Activated:Connect(function()
           CircleClick(ToggleButton, Player:GetMouse().X, Player:GetMouse().Y)
           Funcs_Toggle.Value = not Funcs_Toggle.Value

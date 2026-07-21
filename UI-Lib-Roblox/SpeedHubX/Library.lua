@@ -1262,9 +1262,9 @@ function Speed_Library:CreateWindow(Config)
 
 
   local DropShadow = Custom:Create("ImageLabel", {
-    Image = "rbxassetid://6015897843",
+    Image = "",
     ImageColor3 = Custom.ColorRGB,
-    ImageTransparency = 0.6,
+    ImageTransparency = 1,
     ScaleType = Enum.ScaleType.Slice,
     SliceCenter = Rect.new(49, 49, 450, 450),
     AnchorPoint = Vector2.new(0.5, 0.5),

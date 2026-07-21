@@ -2119,6 +2119,7 @@ function Speed_Library:CreateWindow(Config)
           Name = "ParagraphContent",
         }, Paragraph)
 
+        local lastParagraphY = 0
         local function UpdateParagraphSize()
           ParagraphContent.TextWrapped = false
           local calcX = ParagraphContent.TextBounds.X
@@ -2126,16 +2127,14 @@ function Speed_Library:CreateWindow(Config)
           local lineCount = math.max(1, math.ceil(calcX / sizeX))
 
           local newY = 12 + (12 * lineCount)
-          if ParagraphContent.Size.Y.Offset == newY then
-              ParagraphContent.TextWrapped = true
-              return
-          end
-          
           ParagraphContent.Size = UDim2.new(1, -16, 0, newY)
-          Paragraph.Size = UDim2.new(1, 0, 0, ParagraphContent.AbsoluteSize.Y + 33)
+          Paragraph.Size = UDim2.new(1, 0, 0, newY + 33)
           ParagraphContent.TextWrapped = true
 
-          UpdateSizeSection()
+          if Paragraph.Size.Y.Offset ~= lastParagraphY then
+              lastParagraphY = Paragraph.Size.Y.Offset
+              UpdateSizeSection()
+          end
         end
 
         UpdateParagraphSize()

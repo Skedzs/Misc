@@ -2124,7 +2124,8 @@ function Speed_Library:CreateWindow(Config)
           ParagraphContent.TextWrapped = false
           local calcX = ParagraphContent.TextBounds.X
           local sizeX = math.max(1, ParagraphContent.AbsoluteSize.X)
-          local lineCount = math.max(1, math.ceil(calcX / sizeX))
+          local lineCount = math.ceil(calcX / sizeX)
+          if ParagraphContent.Text == "" then lineCount = 0 end
 
           local newY = 12 + (12 * lineCount)
           ParagraphContent.Size = UDim2.new(1, -16, 0, newY)

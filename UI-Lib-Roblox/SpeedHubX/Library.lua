@@ -1233,6 +1233,7 @@ function Speed_Library:CreateWindow(Config)
 
   local Funcs = {}
   local Tabs = {}
+  local CurrentTab = nil
 
   local TargetParent = RunService:IsStudio() and Player.PlayerGui or (gethui() or cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui"))
   if TargetParent:FindFirstChild("Skedz_SpeedHubX") then
@@ -1881,7 +1882,8 @@ function Speed_Library:CreateWindow(Config)
     }, Tab)
 
     if CountTab == 1 then
-      LayersPageLayout:JumpToIndex(0)
+      CurrentTab = ScrolLayers
+      LayersPageLayout:JumpTo(ScrolLayers)
       NameTab.Text = _Name
   
       local ChooseFrame = Custom:Create("Frame", {
@@ -1916,7 +1918,7 @@ function Speed_Library:CreateWindow(Config)
         if FrameChoose then break end
       end
   
-      if FrameChoose and Tab.LayoutOrder ~= LayersPageLayout.CurrentPage.LayoutOrder then
+      if FrameChoose and (not CurrentTab or Tab.LayoutOrder ~= CurrentTab.LayoutOrder) then
         for _, TabFrame in pairs(ScrollTab:GetChildren()) do
           if TabFrame.Name == "Tab" then
             TweenService:Create(TabFrame, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.InOut), {BackgroundTransparency = 0.999}):Play()
@@ -1928,8 +1930,9 @@ function Speed_Library:CreateWindow(Config)
 
         _TabT:Play()
         _FTween:Play()
-  
-        LayersPageLayout:JumpToIndex(Tab.LayoutOrder)
+
+        CurrentTab = ScrolLayers
+        LayersPageLayout:JumpTo(ScrolLayers)
 
         task.wait(0.05)
         NameTab.Text = _Name

@@ -1233,13 +1233,10 @@ function Speed_Library:CreateWindow(Config)
 
   local Funcs = {}
   local Tabs = {}
-  local CurrentTab = nil
 
   local TargetParent = RunService:IsStudio() and Player.PlayerGui or (gethui() or cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui"))
   if TargetParent:FindFirstChild("Skedz_SpeedHubX") then
-      local oldGui = TargetParent:FindFirstChild("Skedz_SpeedHubX")
-      oldGui.Enabled = false
-      oldGui:Destroy()
+      TargetParent:FindFirstChild("Skedz_SpeedHubX"):Destroy()
   end
   local SpeedHubXGui = Custom:Create("ScreenGui", {
     Name = "Skedz_SpeedHubX",
@@ -1253,51 +1250,48 @@ function Speed_Library:CreateWindow(Config)
     ZIndex = 0,
     Name = "DropShadowHolder",
     AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.new(0.5, 0, 0.5, 0),
-    Visible = false
+    Position = UDim2.new(0.5, 0, 0.5, 0)
   }, SpeedHubXGui)
   local MainScale = Custom:Create("UIScale", {
     Scale = 0
   }, DropShadowHolder)
 
-  -- Pop-in animation: show holder at scale 0, then tween to 1
-  DropShadowHolder.Visible = true
+  -- Initial pop-in animation
   local initTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
   TweenService:Create(MainScale, initTweenInfo, {Scale = 1}):Play()
 
 
   local DropShadow = Custom:Create("ImageLabel", {
     Image = "",
-    ImageColor3 = Custom.ColorRGB,
-    ImageTransparency = 1,
+    ImageColor3 = Color3.fromRGB(15, 15, 15),
+    ImageTransparency = 0.5,
     ScaleType = Enum.ScaleType.Slice,
     SliceCenter = Rect.new(49, 49, 450, 450),
     AnchorPoint = Vector2.new(0.5, 0.5),
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
     Position = UDim2.new(0.5, 0, 0.5, 0),
-    Size = UDim2.new(1, 35, 1, 35),
+    Size = SizeUi,
     ZIndex = 0,
     Name = "DropShadow"
   }, DropShadowHolder)
 
   local Main = Custom:Create("Frame", {
     AnchorPoint = Vector2.new(0.5, 0.5),
-    BackgroundColor3 = Color3.fromRGB(12, 12, 12),
-    BackgroundTransparency = 0.15,
+    BackgroundColor3 = Color3.fromRGB(15, 15, 15),
+    BackgroundTransparency = 0.1,
     BorderColor3 = Color3.fromRGB(30, 30, 30),
     BorderSizePixel = 0,
     Position = UDim2.new(0.5, 0, 0.5, 0),
     Size = SizeUi,
     Name = "Main"
-  }, DropShadowHolder)
+  }, DropShadow)
 
-  Custom:Create("UICorner", { CornerRadius = UDim.new(0, 8) }, Main)
+  Custom:Create("UICorner", {}, Main)
 
   Custom:Create("UIStroke", {
-    Color = Custom.ColorRGB,
-    Transparency = 0.3,
-    Thickness = 1.2
+    Color = Color3.fromRGB(50, 50, 50),
+    Thickness = 1.6
   }, Main)
 
   local Top = Custom:Create("Frame", {
@@ -1453,18 +1447,16 @@ function Speed_Library:CreateWindow(Config)
   }, LayersFolder)
 
   local ScrollTab = Custom:Create("ScrollingFrame", {
-    CanvasSize = UDim2.new(0, 0, 0, 0),
-    ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100),
-    ScrollBarThickness = 3,
-    ScrollBarImageTransparency = 0.3,
+    CanvasSize = UDim2.new(0, 0, 2.10000002, 0),
+    ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0),
+    ScrollBarThickness = 0,
     Active = true,
     BackgroundColor3 = Color3.fromRGB(18, 18, 18),
     BackgroundTransparency = 0.9990000128746033,
     BorderColor3 = Color3.fromRGB(30, 30, 30),
     BorderSizePixel = 0,
     Size = UDim2.new(1, 0, 1, -10),
-    Name = "ScrollTab",
-    ClipsDescendants = true
+    Name = "ScrollTab"
   }, LayersTab)
 
   local UIListLayout = Custom:Create("UIListLayout", {
@@ -1472,37 +1464,37 @@ function Speed_Library:CreateWindow(Config)
     SortOrder = Enum.SortOrder.LayoutOrder
   }, ScrollTab)
 
-  local function CalcTabHeight(totalTabs)
-    totalTabs = totalTabs or 0
-    if totalTabs <= 0 then return 33 end
-    local mainH = SizeUi.Y.Offset
-    if mainH <= 0 and Main then
-      mainH = Main.AbsoluteSize.Y
-    end
-    if mainH <= 0 then mainH = 315 end
-    local available = mainH - 69
-    if totalTabs * 33 <= available then
-      return 33
-    end
-    return math.max(22, math.floor((available - (totalTabs - 1) * 3) / totalTabs))
-  end
+  local TabHeight = 33
 
-  local TabHeight = CalcTabHeight(1)
-
-  local function UpdateAllTabSizes()
+  local function RecalcTabHeight()
     if type(CountTab) ~= "number" or CountTab <= 0 then return end
-    TabHeight = CalcTabHeight(CountTab)
+    local available = ScrollTab.AbsoluteSize.Y
+    if not available or available <= 0 then return end
+
+    if CountTab * 33 <= available then
+      TabHeight = 33
+    else
+      TabHeight = math.max(22, math.floor((available - (CountTab - 1) * 3) / CountTab))
+    end
+
     for _, child in pairs(ScrollTab:GetChildren()) do
       if child.Name == "Tab" then
         child.Size = UDim2.new(1, 0, 0, TabHeight)
+
+        local chooseFrame = nil
         for _, sub in pairs(child:GetChildren()) do
           if sub.Name == "ChooseFrame" then
-            sub.Position = UDim2.new(0, 2, 0, math.floor(TabHeight * 0.3))
-            sub.Size = UDim2.new(0, 1, 0, math.floor(TabHeight * 0.4))
+            chooseFrame = sub
+            break
           end
+        end
+        if chooseFrame then
+          chooseFrame.Position = UDim2.new(0, 2, 0, math.floor(TabHeight * 0.3))
+          chooseFrame.Size = UDim2.new(0, 1, 0, math.floor(TabHeight * 0.4))
         end
       end
     end
+
     UpdateSize()
   end
 
@@ -1520,21 +1512,6 @@ function Speed_Library:CreateWindow(Config)
 
   ScrollTab.ChildAdded:Connect(UpdateSize)
   ScrollTab.ChildRemoved:Connect(UpdateSize)
-
-  ScrollTab.ChildAdded:Connect(function(child)
-    if child.Name == "Tab" then
-      task.defer(function()
-        local count = 0
-        for _, c in pairs(ScrollTab:GetChildren()) do
-          if c.Name == "Tab" then count += 1 end
-        end
-        CountTab = count
-        if CountTab > 0 then
-          UpdateAllTabSizes()
-        end
-      end)
-    end
-  end)
 
   Min.Activated:Connect(function()
 		CircleClick(Min, Player:GetMouse().X, Player:GetMouse().Y)
@@ -1669,15 +1646,11 @@ function Speed_Library:CreateWindow(Config)
       closeUIAndModal()
       if SpeedHubXGui then SpeedHubXGui:Destroy() end
       if Open_Close and Open_Close.Parent then Open_Close.Parent:Destroy() end
+      if not Speed_Library.Unloaded then Speed_Library.Unloaded = true end
   end)
 
 
-  -- Ensure TextBounds is calculated before sizing
-  if TextLabel.TextBounds.X == 0 then
-    task.wait()
-  end
-  local holderWidth = math.max(455, 115 + TextLabel.TextBounds.X + 1 + TextLabel1.TextBounds.X)
-  DropShadowHolder.Size = UDim2.new(0, holderWidth, 0, 350)
+  DropShadowHolder.Size = UDim2.new(0, 115 + TextLabel.TextBounds.X + 1 + TextLabel1.TextBounds.X, 0, 350)
 	MakeDraggable(Top, DropShadowHolder)
 
 
@@ -1807,12 +1780,9 @@ function Speed_Library:CreateWindow(Config)
   local CountTab = 0
   local CountDropdown = 0
   function Tabs:CreateTab(Config)
-    local _Name = Config[1] or Config.Name or ""
+    local _Name = Config[1] or Config.Name or "" 
     local Icon = GetIcon(Config[2] or Config.Icon or "")
-
-    CountTab += 1
-    TabHeight = CalcTabHeight(CountTab)
-
+    
     local ScrolLayers = Custom:Create("ScrollingFrame", {
 			ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80),
 			ScrollBarThickness = 0,
@@ -1822,7 +1792,6 @@ function Speed_Library:CreateWindow(Config)
 			BackgroundTransparency = 0.999,
 			BorderColor3 = Color3.fromRGB(30, 30, 30),
 			BorderSizePixel = 0,
-			CanvasSize = UDim2.new(0, 0, 0, 0),
 			Size = UDim2.new(1, 0, 1, 0),
 			Name = "ScrolLayers",
 			Parent = LayersFolder
@@ -1836,7 +1805,7 @@ function Speed_Library:CreateWindow(Config)
 
     local Tab = Custom:Create("Frame", {
 			BackgroundColor3 = Color3.fromRGB(18, 18, 18),
-			BackgroundTransparency = CountTab == 1 and 0.92 or 0.999,
+			BackgroundTransparency = CountTab == 0 and 0.92 or 0.999,
 			BorderColor3 = Color3.fromRGB(30, 30, 30),
 			BorderSizePixel = 0,
 			LayoutOrder = CountTab,
@@ -1890,9 +1859,8 @@ function Speed_Library:CreateWindow(Config)
       Name = "FeatureImg",
     }, Tab)
 
-    if CountTab == 1 then
-      CurrentTab = ScrolLayers
-      LayersPageLayout:JumpTo(ScrolLayers)
+    if CountTab == 0 then
+      LayersPageLayout:JumpToIndex(0)
       NameTab.Text = _Name
   
       local ChooseFrame = Custom:Create("Frame", {
@@ -1927,7 +1895,7 @@ function Speed_Library:CreateWindow(Config)
         if FrameChoose then break end
       end
   
-      if FrameChoose and (not CurrentTab or Tab.LayoutOrder ~= CurrentTab.LayoutOrder) then
+      if FrameChoose and Tab.LayoutOrder ~= LayersPageLayout.CurrentPage.LayoutOrder then
         for _, TabFrame in pairs(ScrollTab:GetChildren()) do
           if TabFrame.Name == "Tab" then
             TweenService:Create(TabFrame, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.InOut), {BackgroundTransparency = 0.999}):Play()
@@ -1939,25 +1907,11 @@ function Speed_Library:CreateWindow(Config)
 
         _TabT:Play()
         _FTween:Play()
-
-        CurrentTab = ScrolLayers
-        LayersPageLayout:JumpTo(ScrolLayers)
-
+  
+        LayersPageLayout:JumpToIndex(Tab.LayoutOrder)
+  
         task.wait(0.05)
         NameTab.Text = _Name
-
-        for _, scrolLayer in pairs(LayersFolder:GetChildren()) do
-          if scrolLayer:IsA("ScrollingFrame") and scrolLayer.LayoutOrder == Tab.LayoutOrder then
-            local totalOffset = 0
-            for _, child in pairs(scrolLayer:GetChildren()) do
-              if child:IsA("GuiObject") then
-                totalOffset = totalOffset + 3 + child.Size.Y.Offset
-              end
-            end
-            scrolLayer.CanvasSize = UDim2.new(0, 0, 0, totalOffset)
-            break
-          end
-        end
   
         TweenService:Create(FrameChoose, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {Size = UDim2.new(0, 1, 0, 20)}):Play()
   
@@ -2199,23 +2153,23 @@ function Speed_Library:CreateWindow(Config)
           Name = "ParagraphContent",
         }, Paragraph)
 
-        local lastParagraphY = 0
         local function UpdateParagraphSize()
           ParagraphContent.TextWrapped = false
           local calcX = ParagraphContent.TextBounds.X
           local sizeX = math.max(1, ParagraphContent.AbsoluteSize.X)
-          local lineCount = math.ceil(calcX / sizeX)
-          if ParagraphContent.Text == "" then lineCount = 0 end
+          local lineCount = math.max(1, math.ceil(calcX / sizeX))
 
           local newY = 12 + (12 * lineCount)
+          if ParagraphContent.Size.Y.Offset == newY then
+              ParagraphContent.TextWrapped = true
+              return
+          end
+          
           ParagraphContent.Size = UDim2.new(1, -16, 0, newY)
-          Paragraph.Size = UDim2.new(1, 0, 0, newY + 33)
+          Paragraph.Size = UDim2.new(1, 0, 0, ParagraphContent.AbsoluteSize.Y + 33)
           ParagraphContent.TextWrapped = true
 
-          if Paragraph.Size.Y.Offset ~= lastParagraphY then
-              lastParagraphY = Paragraph.Size.Y.Offset
-              UpdateSizeSection()
-          end
+          UpdateSizeSection()
         end
 
         UpdateParagraphSize()
@@ -2415,14 +2369,6 @@ function Speed_Library:CreateWindow(Config)
           Size = UDim2.new(1, 0, 1, 0)
         }, FeatureFrame1)
 
-        ButtonButton.MouseEnter:Connect(function()
-            TweenService:Create(Button, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.1, BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
-        end)
-        
-        ButtonButton.MouseLeave:Connect(function()
-            TweenService:Create(Button, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.2, BackgroundColor3 = Color3.fromRGB(28, 28, 28)}):Play()
-        end)
-
         ButtonButton.Activated:Connect(function()
 					CircleClick(ButtonButton, Player:GetMouse().X, Player:GetMouse().Y)
 
@@ -2563,14 +2509,6 @@ function Speed_Library:CreateWindow(Config)
           TweenService:Create(FeatureFrame2, tweenInfo, {BackgroundColor3 = FrameColor, BackgroundTransparency = FrameTransparency}):Play()
         end
       
-        ToggleButton.MouseEnter:Connect(function()
-            TweenService:Create(Toggle, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.1, BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
-        end)
-
-        ToggleButton.MouseLeave:Connect(function()
-            TweenService:Create(Toggle, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.2, BackgroundColor3 = Color3.fromRGB(28, 28, 28)}):Play()
-        end)
-
         ToggleButton.Activated:Connect(function()
           CircleClick(ToggleButton, Player:GetMouse().X, Player:GetMouse().Y)
           Funcs_Toggle.Value = not Funcs_Toggle.Value
@@ -3291,7 +3229,8 @@ function Speed_Library:CreateWindow(Config)
       return Item
     end
 
-    UpdateAllTabSizes()
+    CountTab += 1
+    RecalcTabHeight()
     return Sections
   end
 

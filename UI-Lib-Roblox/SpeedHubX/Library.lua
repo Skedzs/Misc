@@ -1237,7 +1237,9 @@ function Speed_Library:CreateWindow(Config)
 
   local TargetParent = RunService:IsStudio() and Player.PlayerGui or (gethui() or cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui"))
   if TargetParent:FindFirstChild("Skedz_SpeedHubX") then
-      TargetParent:FindFirstChild("Skedz_SpeedHubX"):Destroy()
+      local oldGui = TargetParent:FindFirstChild("Skedz_SpeedHubX")
+      oldGui.Enabled = false
+      oldGui:Destroy()
   end
   local SpeedHubXGui = Custom:Create("ScreenGui", {
     Name = "Skedz_SpeedHubX",
@@ -1251,13 +1253,15 @@ function Speed_Library:CreateWindow(Config)
     ZIndex = 0,
     Name = "DropShadowHolder",
     AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.new(0.5, 0, 0.5, 0)
+    Position = UDim2.new(0.5, 0, 0.5, 0),
+    Visible = false
   }, SpeedHubXGui)
   local MainScale = Custom:Create("UIScale", {
     Scale = 0
   }, DropShadowHolder)
 
-  -- Initial pop-in animation
+  -- Pop-in animation: show holder at scale 0, then tween to 1
+  DropShadowHolder.Visible = true
   local initTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
   TweenService:Create(MainScale, initTweenInfo, {Scale = 1}):Play()
 
@@ -1668,7 +1672,12 @@ function Speed_Library:CreateWindow(Config)
   end)
 
 
-  DropShadowHolder.Size = UDim2.new(0, 115 + TextLabel.TextBounds.X + 1 + TextLabel1.TextBounds.X, 0, 350)
+  -- Ensure TextBounds is calculated before sizing
+  if TextLabel.TextBounds.X == 0 then
+    task.wait()
+  end
+  local holderWidth = math.max(455, 115 + TextLabel.TextBounds.X + 1 + TextLabel1.TextBounds.X)
+  DropShadowHolder.Size = UDim2.new(0, holderWidth, 0, 350)
 	MakeDraggable(Top, DropShadowHolder)
 
 

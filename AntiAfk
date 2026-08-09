@@ -1,0 +1,21 @@
+-- Notification System
+local NotificationHolder, Notification
+pcall(function()
+    NotificationHolder = loadstring(game:HttpGet("https://raw.githubusercontent.com/Skedzs/Misc/refs/heads/main/Notification/Holder"))()
+    Notification = loadstring(game:HttpGet("https://raw.githubusercontent.com/Skedzs/Misc/refs/heads/main/Notification/Notif"))()
+end)
+
+local function notify(title, content, duration)
+    if Notification and Notification.Notify then
+        Notification:Notify({ Title = title, Description = content }, { OutlineColor = Color3.fromRGB(100, 100, 100), Time = duration or 5, Type = "default" })
+    end
+end
+
+-- Anti Afk
+local vu = game:GetService("VirtualUser")
+game:GetService("Players").LocalPlayer.Idled:connect(function()
+vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+wait(1)
+vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+end)
+notify("Skedz Hub", "Anti-AFK automatically activated.", 3)

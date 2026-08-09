@@ -1666,7 +1666,8 @@ function Speed_Library:CreateWindow(Config)
     Position = UDim2.new(1, 8, 1, 8),
     Size = UDim2.new(1, 154, 1, 54),
     Visible = false,
-    Name = "MoreBlur"
+    Name = "MoreBlur",
+    ZIndex = 2
   }, Layers)
 
   local DropShadowHolder1 = Custom:Create("Frame", {
@@ -1723,12 +1724,10 @@ function Speed_Library:CreateWindow(Config)
     if MoreBlur.Visible then
       local tweenInfo = TweenInfo.new(0.2)
 
-      local _Hide = TweenService:Create(MoreBlur, tweenInfo, {BackgroundTransparency = 0.999})
       local _Move = TweenService:Create(DropdownSelect, tweenInfo, {Position = UDim2.new(1, 172, 0.5, 0)})
 
-      _Hide:Play()
       _Move:Play()
-        
+
       task.wait(0.2)
       MoreBlur.Visible = false
     end
@@ -2969,15 +2968,13 @@ function Speed_Library:CreateWindow(Config)
         DropdownButton.Activated:Connect(function()
           if not MoreBlur.Visible then
             MoreBlur.Visible = true
-              
+
             local tweenInfo = TweenInfo.new(0.1)
 
             DropPageLayout:JumpToIndex(SelectOptionsFrame.LayoutOrder)
-                            
-            local BlurTween = TweenService:Create(MoreBlur, tweenInfo, {BackgroundTransparency = 0.7})
+
             local DropdownTween = TweenService:Create(DropdownSelect, tweenInfo, {Position = UDim2.new(1, -11, 0.5, 0)})
-              
-            BlurTween:Play()
+
             DropdownTween:Play()
           end
         end)

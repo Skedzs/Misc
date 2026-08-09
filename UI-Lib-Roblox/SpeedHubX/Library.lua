@@ -1468,6 +1468,7 @@ function Speed_Library:CreateWindow(Config)
   }, ScrollTab)
 
   local function CalcTabHeight(totalTabs)
+    totalTabs = totalTabs or 0
     if totalTabs <= 0 then return 33 end
     local mainH = SizeUi.Y.Offset
     if mainH <= 0 and Main then
@@ -1484,6 +1485,7 @@ function Speed_Library:CreateWindow(Config)
   local TabHeight = CalcTabHeight(1)
 
   local function UpdateAllTabSizes()
+    if type(CountTab) ~= "number" or CountTab <= 0 then return end
     TabHeight = CalcTabHeight(CountTab)
     for _, child in pairs(ScrollTab:GetChildren()) do
       if child.Name == "Tab" then
@@ -1522,7 +1524,9 @@ function Speed_Library:CreateWindow(Config)
           if c.Name == "Tab" then count += 1 end
         end
         CountTab = count
-        UpdateAllTabSizes()
+        if CountTab > 0 then
+          UpdateAllTabSizes()
+        end
       end)
     end
   end)

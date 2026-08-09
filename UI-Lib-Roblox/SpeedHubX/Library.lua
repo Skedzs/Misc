@@ -1467,39 +1467,35 @@ function Speed_Library:CreateWindow(Config)
     SortOrder = Enum.SortOrder.LayoutOrder
   }, ScrollTab)
 
-  local TabHeight = 33
-
-  local function RecalcTabHeight()
-    if type(CountTab) ~= "number" or CountTab <= 0 then return end
-
+  local function CalcTabHeight(totalTabs)
+    if totalTabs <= 0 then return 33 end
     local mainH = SizeUi.Y.Offset
-    if mainH <= 0 then return end
-    local available = mainH - 59 - 10
-
-    if CountTab * 33 <= available then
-      TabHeight = 33
-    else
-      TabHeight = math.max(22, math.floor((available - (CountTab - 1) * 3) / CountTab))
+    if mainH <= 0 and Main then
+      mainH = Main.AbsoluteSize.Y
     end
+    if mainH <= 0 then mainH = 315 end
+    local available = mainH - 69
+    if totalTabs * 33 <= available then
+      return 33
+    end
+    return math.max(22, math.floor((available - (totalTabs - 1) * 3) / totalTabs))
+  end
 
+  local TabHeight = CalcTabHeight(1)
+
+  local function UpdateAllTabSizes()
+    TabHeight = CalcTabHeight(CountTab)
     for _, child in pairs(ScrollTab:GetChildren()) do
       if child.Name == "Tab" then
         child.Size = UDim2.new(1, 0, 0, TabHeight)
-
-        local chooseFrame = nil
         for _, sub in pairs(child:GetChildren()) do
           if sub.Name == "ChooseFrame" then
-            chooseFrame = sub
-            break
+            sub.Position = UDim2.new(0, 2, 0, math.floor(TabHeight * 0.3))
+            sub.Size = UDim2.new(0, 1, 0, math.floor(TabHeight * 0.4))
           end
-        end
-        if chooseFrame then
-          chooseFrame.Position = UDim2.new(0, 2, 0, math.floor(TabHeight * 0.3))
-          chooseFrame.Size = UDim2.new(0, 1, 0, math.floor(TabHeight * 0.4))
         end
       end
     end
-
     UpdateSize()
   end
 
@@ -1517,6 +1513,19 @@ function Speed_Library:CreateWindow(Config)
 
   ScrollTab.ChildAdded:Connect(UpdateSize)
   ScrollTab.ChildRemoved:Connect(UpdateSize)
+
+  ScrollTab.ChildAdded:Connect(function(child)
+    if child.Name == "Tab" then
+      task.defer(function()
+        local count = 0
+        for _, c in pairs(ScrollTab:GetChildren()) do
+          if c.Name == "Tab" then count += 1 end
+        end
+        CountTab = count
+        UpdateAllTabSizes()
+      end)
+    end
+  end)
 
   Min.Activated:Connect(function()
 		CircleClick(Min, Player:GetMouse().X, Player:GetMouse().Y)
@@ -1784,12 +1793,15 @@ function Speed_Library:CreateWindow(Config)
   local CountTab = 0
   local CountDropdown = 0
   function Tabs:CreateTab(Config)
-    local _Name = Config[1] or Config.Name or "" 
+    local _Name = Config[1] or Config.Name or ""
     local Icon = GetIcon(Config[2] or Config.Icon or "")
-    
+
+    CountTab += 1
+    TabHeight = CalcTabHeight(CountTab)
+
     local ScrolLayers = Custom:Create("ScrollingFrame", {
 			ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80),
-			ScrollBarThickness = 3,
+			ScrollBarThickness = 0,
 			Active = true,
 			LayoutOrder = CountTab,
 			BackgroundColor3 = Color3.fromRGB(18, 18, 18),
@@ -1808,19 +1820,9 @@ function Speed_Library:CreateWindow(Config)
       Parent = ScrolLayers
     })
 
-    task.defer(function()
-      local offset = 0
-      for _, child in pairs(ScrolLayers:GetChildren()) do
-        if child:IsA("GuiObject") then
-          offset = offset + 3 + child.Size.Y.Offset
-        end
-      end
-      ScrolLayers.CanvasSize = UDim2.new(0, 0, 0, offset)
-    end)
-
     local Tab = Custom:Create("Frame", {
 			BackgroundColor3 = Color3.fromRGB(18, 18, 18),
-			BackgroundTransparency = CountTab == 0 and 0.92 or 0.999,
+			BackgroundTransparency = CountTab == 1 and 0.92 or 0.999,
 			BorderColor3 = Color3.fromRGB(30, 30, 30),
 			BorderSizePixel = 0,
 			LayoutOrder = CountTab,
@@ -1874,7 +1876,7 @@ function Speed_Library:CreateWindow(Config)
       Name = "FeatureImg",
     }, Tab)
 
-    if CountTab == 0 then
+    if CountTab == 1 then
       LayersPageLayout:JumpToIndex(0)
       NameTab.Text = _Name
   
@@ -3273,8 +3275,7 @@ function Speed_Library:CreateWindow(Config)
       return Item
     end
 
-    CountTab += 1
-    RecalcTabHeight()
+    UpdateAllTabSizes()
     return Sections
   end
 

@@ -1,12 +1,12 @@
 local FuncsV3 = {}
-local SaveConfig = nil  
+local SaveConfig = {}
 
 local function Checker(Val, Val1, Val2)
   return typeof(Val) == Val1 and Val or Val2
 end
 
 function FuncsV3:SetTable(path)
-  SaveConfig = path
+  SaveConfig = type(path) == "table" and path or {}
 end
 
 function FuncsV3:Toggle(Tab, Name, Content, Default, Callback)
@@ -14,7 +14,7 @@ function FuncsV3:Toggle(Tab, Name, Content, Default, Callback)
   Content = Checker(Content, "string", tostring(Content))
   Callback = Checker(Callback, "function", function() end)
 
-  local _default = Default == "Save" 
+  local _default = Default == "Save"
   and Checker(SaveConfig[Name], "boolean", false)
   or Checker(Default, "boolean", false)
 
@@ -39,6 +39,29 @@ function FuncsV3:Button(Tab, Name, Content, Callback)
   })
 end
 
+function FuncsV3:Slider(Tab, Name, Content, Increment, Min, Max, Default, Callback)
+  Name = Checker(Name, "string", tostring(Name))
+  Content = Checker(Content, "string", tostring(Content))
+  Increment = Checker(Increment, "number", 1)
+  Min = Checker(Min, "number", 0)
+  Max = Checker(Max, "number", 100)
+  Callback = Checker(Callback, "function", function() end)
+
+  local _default = Default == "Save"
+  and Checker(SaveConfig[Name], "number", Min)
+  or Checker(Default, "number", Min)
+
+  return Tab:AddSlider({
+    Title = Name,
+    Content = Content,
+    Increment = Increment,
+    Min = Min,
+    Max = Max,
+    Default = _default,
+    Callback = Callback
+  })
+end
+
 function FuncsV3:Dropdown(Tab, Name, Content, multi, options, Default, Callback)
   Name = Checker(Name, "string", tostring(Name))
   Content = Checker(Content, "string", tostring(Content))
@@ -47,19 +70,13 @@ function FuncsV3:Dropdown(Tab, Name, Content, multi, options, Default, Callback)
   Callback = Checker(Callback, "function", function() end)
 
   local _default
-
-  if Default == "Save" then
-    if type(SaveConfig[Name]) == "table" then
-      _default = SaveConfig[Name] or {""}
-    else
-      _default = {SaveConfig[Name] or ""}
-    end
+  local sourceVal = (Default == "Save") and SaveConfig[Name] or (SaveConfig[Name] or Default)
+  if type(sourceVal) == "table" then
+    _default = sourceVal
+  elseif type(sourceVal) == "string" and sourceVal ~= "" then
+    _default = {sourceVal}
   else
-    if type(SaveConfig[Name] or Default) == "table" then
-      _default = SaveConfig[Name] or Default
-    else
-      _default = {SaveConfig[Name] or Default}
-    end
+    _default = {}
   end
 
   return Tab:AddDropdown({
@@ -77,7 +94,7 @@ function FuncsV3:Textbox(Tab, Name, Content, Default, Callback)
   Content = Checker(Content, "string", tostring(Content))
   Callback = Checker(Callback, "function", function() end)
 
-  local _default = Default == "Save" 
+  local _default = Default == "Save"
   and Checker(SaveConfig[Name], "string", "")
   or Checker(Default, "string", "")
 

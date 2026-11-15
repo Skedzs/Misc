@@ -1,7 +1,7 @@
 -- Notification System
-local NotificationHolder, Notification
+local Notification
 pcall(function()
-    NotificationHolder = loadstring(game:HttpGet("https://raw.githubusercontent.com/Skedzs/Misc/refs/heads/main/Notification/Holder"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Skedzs/Misc/refs/heads/main/Notification/Holder"))()
     Notification = loadstring(game:HttpGet("https://raw.githubusercontent.com/Skedzs/Misc/refs/heads/main/Notification/Notif"))()
 end)
 
@@ -11,11 +11,28 @@ local function notify(title, content, duration)
     end
 end
 
--- Anti Afk
+-- Anti-AFK
+local Players = game:GetService("Players")
 local vu = game:GetService("VirtualUser")
-game:GetService("Players").LocalPlayer.Idled:connect(function()
-vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
-wait(1)
-vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
-end)
+local localPlayer = Players.LocalPlayer
+local sharedEnv = (type(getgenv) == "function" and getgenv()) or _G
+
+if typeof(sharedEnv._SkedzSpeedHubAfkConn) == "RBXScriptConnection" then
+    pcall(function()
+        sharedEnv._SkedzSpeedHubAfkConn:Disconnect()
+    end)
+    sharedEnv._SkedzSpeedHubAfkConn = nil
+end
+
+if localPlayer then
+    sharedEnv._SkedzSpeedHubAfkConn = localPlayer.Idled:Connect(function()
+        local cam = workspace.CurrentCamera
+        local targetCFrame = cam and cam.CFrame or CFrame.new()
+        vu:CaptureController()
+        vu:Button2Down(Vector2.new(0, 0), targetCFrame)
+        task.wait(1)
+        vu:Button2Up(Vector2.new(0, 0), targetCFrame)
+    end)
+end
+
 notify("Skedz Hub", "Anti-AFK automatically activated.", 3)

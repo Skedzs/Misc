@@ -4,6 +4,55 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualUser = game:GetService("VirtualUser")
+local TextService = game:GetService("TextService")
+
+local function GetSafeGuiParent()
+  if RunService:IsStudio() then
+    return Player:WaitForChild("PlayerGui")
+  end
+  if type(gethui) == "function" then
+    local ok, gui = pcall(gethui)
+    if ok and typeof(gui) == "Instance" then
+      return gui
+    end
+  end
+  if type(cloneref) == "function" then
+    local ok, gui = pcall(cloneref, game:GetService("CoreGui"))
+    if ok and typeof(gui) == "Instance" then
+      return gui
+    end
+  end
+  local ok, coreGui = pcall(function()
+    return game:GetService("CoreGui")
+  end)
+  if ok and coreGui then
+    return coreGui
+  end
+  return Player:WaitForChild("PlayerGui")
+end
+
+local function ResizeItemContent(itemFrame, contentLabel, widthOffset, minHeight)
+  local sizeX = contentLabel.AbsoluteSize.X
+  local targetHeight = minHeight or 12
+  local text = contentLabel.Text or ""
+  if text ~= "" and sizeX > 10 then
+    local ok, bounds = pcall(function()
+      return TextService:GetTextSize(text, contentLabel.TextSize, contentLabel.Font, Vector2.new(sizeX, 1000))
+    end)
+    if ok and bounds then
+      targetHeight = math.max(minHeight or 12, bounds.Y)
+    end
+  end
+
+  local frameHeight = targetHeight + 33
+  if contentLabel.Size.Y.Offset == targetHeight and itemFrame.Size.Y.Offset == frameHeight then
+    return false
+  end
+
+  contentLabel.Size = UDim2.new(1, widthOffset, 0, targetHeight)
+  itemFrame.Size = UDim2.new(1, 0, 0, frameHeight)
+  return true
+end
 
 local Custom = {}
 
@@ -865,18 +914,31 @@ end
   end
 
   function Custom:EnabledAFK()
-    Player.Idled:Connect(function()
-      VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-      task.wait(1)
-      VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-    end)
+    local sharedEnv = (type(getgenv) == "function" and getgenv()) or _G
+    if typeof(sharedEnv._SkedzSpeedHubAfkConn) == "RBXScriptConnection" then
+      pcall(function()
+        sharedEnv._SkedzSpeedHubAfkConn:Disconnect()
+      end)
+      sharedEnv._SkedzSpeedHubAfkConn = nil
+    end
+
+    if Player then
+      sharedEnv._SkedzSpeedHubAfkConn = Player.Idled:Connect(function()
+        local cam = workspace.CurrentCamera
+        local cframe = cam and cam.CFrame or CFrame.new()
+        VirtualUser:CaptureController()
+        VirtualUser:Button2Down(Vector2.new(0, 0), cframe)
+        task.wait(1)
+        VirtualUser:Button2Up(Vector2.new(0, 0), cframe)
+      end)
+    end
   end
 end
 
 Custom:EnabledAFK()
 
 local function OpenClose()
-  local TargetParent = RunService:IsStudio() and Player.PlayerGui or (gethui() or cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui"))
+  local TargetParent = GetSafeGuiParent()
   if TargetParent:FindFirstChild("Skedz_SpeedHubX_Logo") then
       TargetParent:FindFirstChild("Skedz_SpeedHubX_Logo"):Destroy()
   end
@@ -1003,7 +1065,7 @@ function CircleClick(Button, X, Y)
 		Tween.Completed:Connect(function()
 			for i = 1, 10 do
 				Circle.ImageTransparency = Circle.ImageTransparency + 0.01
-				wait(Time / 10)
+				task.wait(Time / 10)
 			end
 			Circle:Destroy()
 		end)
@@ -1024,7 +1086,7 @@ function Speed_Library:SetNotification(Config)
   local NotificationGui = Custom:Create("ScreenGui", {
     AutoLocalize = false,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-  }, RunService:IsStudio() and Player.PlayerGui or (gethui() or cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui")))
+  }, GetSafeGuiParent())
 
   local NotificationLayout = Custom:Create("Frame", {
     AnchorPoint = Vector2.new(1, 1),
@@ -1215,7 +1277,9 @@ function Speed_Library:SetNotification(Config)
 
     task.wait(tonumber(Time) / 1.2)
 
-    NotificationFrame:Destroy()
+    if NotificationGui and NotificationGui.Parent then
+      NotificationGui:Destroy()
+    end
 
     Waitted = false
   end
@@ -1225,8 +1289,10 @@ function Speed_Library:SetNotification(Config)
 	end)
 
   TweenService:Create(NotificationFrameReal, TweenInfo.new(tonumber(Time), Enum.EasingStyle.Back, Enum.EasingDirection.InOut), {Position = UDim2.new(0, 0, 0, 0)} ):Play()
-  task.wait(tonumber(Delay))
-  Notification:Close()
+  task.spawn(function()
+    task.wait(tonumber(Delay) or 5)
+    Notification:Close()
+  end)
 
   return Notification
 end
@@ -1240,7 +1306,7 @@ function Speed_Library:CreateWindow(Config)
   local Funcs = {}
   local Tabs = {}
 
-  local TargetParent = RunService:IsStudio() and Player.PlayerGui or (gethui() or cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui"))
+  local TargetParent = GetSafeGuiParent()
   if TargetParent:FindFirstChild("Skedz_SpeedHubX") then
       TargetParent:FindFirstChild("Skedz_SpeedHubX"):Destroy()
   end
@@ -1253,7 +1319,7 @@ function Speed_Library:CreateWindow(Config)
   local DropShadowHolder = Custom:Create("Frame", {
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
-    Size = UDim2.new(0, 455, 0, 350),
+    Size = SizeUi,
     ZIndex = 0,
     Name = "DropShadowHolder",
     AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1326,6 +1392,14 @@ function Speed_Library:CreateWindow(Config)
 
   Custom:Create("UICorner", {}, Top)
 
+  local titleTextWidth = TextLabel.TextBounds.X
+  local okBounds, titleBounds = pcall(function()
+    return TextService:GetTextSize(Title, 14, Enum.Font.GothamBold, Vector2.new(2000, 38))
+  end)
+  if okBounds and titleBounds then
+    titleTextWidth = titleBounds.X
+  end
+
   local TextLabel1 = Custom:Create("TextLabel", {
     Font = Enum.Font.GothamBold,
     Text = Description,
@@ -1336,8 +1410,8 @@ function Speed_Library:CreateWindow(Config)
     BackgroundTransparency = 0.9990000128746033,
     BorderColor3 = Color3.fromRGB(30, 30, 30),
     BorderSizePixel = 0,
-    Size = UDim2.new(1, -(TextLabel.TextBounds.X + 104), 1, 0),
-    Position = UDim2.new(0, TextLabel.TextBounds.X + 15, 0, 0)
+    Size = UDim2.new(1, -(titleTextWidth + 104), 1, 0),
+    Position = UDim2.new(0, titleTextWidth + 15, 0, 0)
   }, Top)
 
   Custom:Create("UIStroke", {
@@ -1472,6 +1546,20 @@ function Speed_Library:CreateWindow(Config)
   }, ScrollTab)
 
   local TabHeight = 33
+  local CountTab = 0
+  local CountDropdown = 0
+
+  local function UpdateSize()
+    local _Total = 0
+
+    for _, v in pairs(ScrollTab:GetChildren()) do
+      if v:IsA("GuiObject") and v.Name ~= "UIListLayout" then
+        _Total = _Total + 3 + v.Size.Y.Offset
+      end
+    end
+
+    ScrollTab.CanvasSize = UDim2.new(0, 0, 0, _Total)
+  end
 
   local function RecalcTabHeight()
     if type(CountTab) ~= "number" or CountTab <= 0 then return end
@@ -1505,20 +1593,9 @@ function Speed_Library:CreateWindow(Config)
     UpdateSize()
   end
 
-  local function UpdateSize()
-    local _Total = 0
-
-		for _, v in pairs(ScrollTab:GetChildren()) do
-			if v:IsA("GuiObject") and v.Name ~= "UIListLayout" then
-				_Total = _Total + 3 + v.Size.Y.Offset
-			end
-		end
-
-		ScrollTab.CanvasSize = UDim2.new(0, 0, 0, _Total)
-  end
-
   ScrollTab.ChildAdded:Connect(UpdateSize)
   ScrollTab.ChildRemoved:Connect(UpdateSize)
+  ScrollTab:GetPropertyChangedSignal("AbsoluteSize"):Connect(RecalcTabHeight)
 
   Min.Activated:Connect(function()
 		CircleClick(Min, Player:GetMouse().X, Player:GetMouse().Y)
@@ -1657,8 +1734,8 @@ function Speed_Library:CreateWindow(Config)
   end)
 
 
-  DropShadowHolder.Size = UDim2.new(0, 115 + TextLabel.TextBounds.X + 1 + TextLabel1.TextBounds.X, 0, 350)
-	MakeDraggable(Top, DropShadowHolder)
+  DropShadowHolder.Size = SizeUi
+  MakeDraggable(Top, DropShadowHolder)
 
 
   -- /// Blur
@@ -1783,8 +1860,6 @@ function Speed_Library:CreateWindow(Config)
   -- /// Create Tab
 
   Tabs = {}
-  local CountTab = 0
-  local CountDropdown = 0
   function Tabs:CreateTab(Config)
     local _Name = Config[1] or Config.Name or "" 
     local Icon = GetIcon(Config[2] or Config.Icon or "")
@@ -1931,8 +2006,8 @@ function Speed_Library:CreateWindow(Config)
     local Sections, CountSection = {}, 0
 
     function Sections:AddSection(Title, OpenSection)
-      local Title = Title or ""
-      local OpenSection = OpenSection or false
+      Title = Title or ""
+      OpenSection = OpenSection or false
   
       local Section = Custom:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(18, 18, 18),
@@ -2070,45 +2145,49 @@ function Speed_Library:CreateWindow(Config)
       local function UpdateSizeSection()
         if OpenSection then
           local SectionSizeYWitdh = 38
-  
+
           for _, v in pairs(SectionAdd:GetChildren()) do
             if v.Name ~= "UIListLayout" and v.Name ~= "UICorner" then
               SectionSizeYWitdh = SectionSizeYWitdh + v.Size.Y.Offset + 3
             end
           end
-    
+
           TweenService:Create(FeatureFrame, TweenInfo.new(0.1), {Rotation = 90}):Play()
           TweenService:Create(Section, TweenInfo.new(0.1), {Size = UDim2.new(1, 1, 0, SectionSizeYWitdh)}):Play()
           TweenService:Create(SectionAdd, TweenInfo.new(0.1), {Size = UDim2.new(1, 0, 0, SectionSizeYWitdh - 38)}):Play()
           TweenService:Create(SectionDecideFrame, TweenInfo.new(0.1), {Size = UDim2.new(1, 0, 0, 2)}):Play()
-            
-          task.wait(0.5)
+
           UpdateSizeScroll()
+          task.delay(0.12, UpdateSizeScroll)
         end
       end
-    
+
       local function ToggleSection()
         CircleClick(SectionButton, Player:GetMouse().X, Player:GetMouse().Y)
-        
+
         if OpenSection then
           TweenService:Create(FeatureFrame, TweenInfo.new(0.1), {Rotation = 0}):Play()
           TweenService:Create(Section, TweenInfo.new(0.1), {Size = UDim2.new(1, 1, 0, 30)}):Play()
           TweenService:Create(SectionDecideFrame, TweenInfo.new(0.1), {Size = UDim2.new(0, 0, 0, 2)}):Play()
-    
+
           OpenSection = false
-          task.wait(0.1)
           UpdateSizeScroll()
+          task.delay(0.12, UpdateSizeScroll)
         else
           OpenSection = true
           UpdateSizeSection()
         end
       end
-    
+
       SectionButton.Activated:Connect(ToggleSection)
       SectionAdd.ChildAdded:Connect(UpdateSizeSection)
       SectionAdd.ChildRemoved:Connect(UpdateSizeSection)
-    
-      UpdateSizeScroll()
+
+      if OpenSection then
+        UpdateSizeSection()
+      else
+        UpdateSizeScroll()
+      end
 
       local Item, ItemCount = {}, 0
       function Item:AddParagraph(Config)
@@ -2161,7 +2240,6 @@ function Speed_Library:CreateWindow(Config)
           Name = "ParagraphContent",
         }, Paragraph)
 
-        local TextService = game:GetService("TextService")
         local function UpdateParagraphSize()
           local text = ParagraphContent.Text or ""
           if text == "" then
@@ -2351,21 +2429,13 @@ function Speed_Library:CreateWindow(Config)
 					Size = UDim2.new(1, -100, 0, 12)
 				}, Button)
 
-        local function UpdateButtonSize()
-          local _Height = 12 + (12 * (ButtonContent.TextBounds.X // ButtonContent.AbsoluteSize.X))
-          ButtonContent.Size = UDim2.new(1, -100, 0, _Height)
-          
-          Button.Size = UDim2.new(1, 0, 0, ButtonContent.AbsoluteSize.Y + 33)
-        end
-      
         ButtonContent.TextWrapped = true
-        UpdateButtonSize()
-      
+        ResizeItemContent(Button, ButtonContent, -100, 12)
+
         ButtonContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-          ButtonContent.TextWrapped = false
-          UpdateButtonSize()
-          ButtonContent.TextWrapped = true
-          UpdateSizeSection()
+          if ResizeItemContent(Button, ButtonContent, -100, 12) then
+            UpdateSizeSection()
+          end
         end)
 
         local ButtonButton = Custom:Create("TextButton", {
@@ -2463,20 +2533,13 @@ function Speed_Library:CreateWindow(Config)
 					Size = UDim2.new(1, -100, 0, 12)
 				}, Toggle)
 				
-        local function UpdateToggleSize()
-          ToggleContent.TextWrapped = false
-          local Ratio = ToggleContent.TextBounds.X / ToggleContent.AbsoluteSize.X
+        ToggleContent.TextWrapped = true
+        ResizeItemContent(Toggle, ToggleContent, -100, 12)
 
-          ToggleContent.Size = UDim2.new(1, -100, 0, 12 + (12 * math.ceil(Ratio)))
-          Toggle.Size = UDim2.new(1, 0, 0, ToggleContent.AbsoluteSize.Y + 33)
-          ToggleContent.TextWrapped = true
-        end
-      
-        UpdateToggleSize()
-      
         ToggleContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-          UpdateToggleSize()
-          UpdateSizeSection()
+          if ResizeItemContent(Toggle, ToggleContent, -100, 12) then
+            UpdateSizeSection()
+          end
         end)
 
         local ToggleButton = Custom:Create("TextButton", {
@@ -2620,7 +2683,6 @@ function Speed_Library:CreateWindow(Config)
           Name = "SliderContent",
         }, Slider)
 
-        local TextService = game:GetService("TextService")
         local function UpdateSliderSize()
           if Content == "" then
             SliderContent.Visible = false
@@ -2764,7 +2826,7 @@ function Speed_Library:CreateWindow(Config)
           return tonumber(string.format("%." .. Decimals .. "f", Rounded)) or Rounded
         end
 
-        function Funcs_Slider:Set(Value)
+        function Funcs_Slider:Set(Value, Silent)
           local Numeric = tonumber(Value)
           if not Numeric then
             Numeric = Min
@@ -2781,12 +2843,16 @@ function Speed_Library:CreateWindow(Config)
           local AnimInfo = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
           TweenService:Create(SliderDraggable, AnimInfo, { Size = UDim2.fromScale(Scale, 1) }):Play()
           TweenService:Create(SliderCircle, AnimInfo, { Position = UDim2.new(Scale, 0, 0.5, 0) }):Play()
+
+          if not Silent then
+            Callback(Funcs_Slider.Value)
+          end
         end
 
         local function UpdateFromInputX(InputPosX)
           local AbsSizeX = math.max(1, SliderFrame.AbsoluteSize.X)
           local SizeScale = math.clamp((InputPosX - SliderFrame.AbsolutePosition.X) / AbsSizeX, 0, 1)
-          Funcs_Slider:Set(Min + ((Max - Min) * SizeScale))
+          Funcs_Slider:Set(Min + ((Max - Min) * SizeScale), true)
         end
 
         local HoverInfo = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -2858,14 +2924,12 @@ function Speed_Library:CreateWindow(Config)
           local Parsed = tonumber(TextBox.Text)
           if Parsed then
             Funcs_Slider:Set(Parsed)
-            Callback(Funcs_Slider.Value)
           else
-            Funcs_Slider:Set(Funcs_Slider.Value)
+            Funcs_Slider:Set(Funcs_Slider.Value, true)
           end
         end)
 
         Funcs_Slider:Set(tonumber(Default))
-        Callback(Funcs_Slider.Value)
 
         ItemCount += 1
         return Funcs_Slider
@@ -2927,21 +2991,12 @@ function Speed_Library:CreateWindow(Config)
           Parent = Input
         })
 
-        local function UpdateInputSize()
-          local Ratio = InputContent.TextBounds.X / InputContent.AbsoluteSize.X
-          local Calculated = 12 + (12 * math.floor(Ratio))
+        ResizeItemContent(Input, InputContent, -180, 12)
 
-          InputContent.Size = UDim2.new(1, -180, 0, Calculated)
-          Input.Size = UDim2.new(1, 0, 0, InputContent.AbsoluteSize.Y + 33)
-        end
-      
-        UpdateInputSize()
-      
         InputContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-          InputContent.TextWrapped = false
-          UpdateInputSize()
-          InputContent.TextWrapped = true
-          UpdateSizeSection()
+          if ResizeItemContent(Input, InputContent, -180, 12) then
+            UpdateSizeSection()
+          end
         end)
 
         local InputFrame = Custom:Create("Frame", {
@@ -3069,19 +3124,13 @@ function Speed_Library:CreateWindow(Config)
           Parent = Dropdown
         })
         
-				DropdownContent.Size = UDim2.new(1, -180, 0, 12 + (12 * (DropdownContent.TextBounds.X // DropdownContent.AbsoluteSize.X)))
-				DropdownContent.TextWrapped = true
-				Dropdown.Size = UDim2.new(1, 0, 0, DropdownContent.AbsoluteSize.Y + 33)
-        
-        DropdownContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-          DropdownContent.TextWrapped = false
-            
-					DropdownContent.Size = UDim2.new(1, -180, 0, 12 + (12 * (DropdownContent.TextBounds.X // DropdownContent.AbsoluteSize.X)))
-					Dropdown.Size = UDim2.new(1, 0, 0, DropdownContent.AbsoluteSize.Y + 33)
-            
-          DropdownContent.TextWrapped = true
+        DropdownContent.TextWrapped = true
+        ResizeItemContent(Dropdown, DropdownContent, -180, 12)
 
-          UpdateSizeSection()
+        DropdownContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+          if ResizeItemContent(Dropdown, DropdownContent, -180, 12) then
+            UpdateSizeSection()
+          end
         end)
 
         local SelectOptionsFrame = Custom:Create("Frame", {
@@ -3294,23 +3343,14 @@ function Speed_Library:CreateWindow(Config)
           Custom:Create("UICorner", {}, ChooseFrame)
   
           OptionButton.Activated:Connect(function()
-
             CircleClick(OptionButton, Player:GetMouse().X, Player:GetMouse().Y)
-        
-            local isOptionSelected = Option.BackgroundTransparency > 0.95
 
             if Multi then
-              if isOptionSelected then
-                if not table.find(Funcs_Dropdown.Value, OptionName) then
-                  table.insert(Funcs_Dropdown.Value, OptionName)
-                end
+              local existingIndex = table.find(Funcs_Dropdown.Value, OptionName)
+              if existingIndex then
+                table.remove(Funcs_Dropdown.Value, existingIndex)
               else
-                for i, value in ipairs(Funcs_Dropdown.Value) do
-                  if value == OptionName then
-                    table.remove(Funcs_Dropdown.Value, i)
-                    break
-                  end
-                end
+                table.insert(Funcs_Dropdown.Value, OptionName)
               end
             else
               Funcs_Dropdown.Value = {OptionName}

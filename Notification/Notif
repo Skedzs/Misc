@@ -2,7 +2,37 @@ local Nofitication = {}
 local ActiveHandles = {}
 
 local function getNotificationGui()
-    return game:GetService("CoreGui"):FindFirstChild("STX_Nofitication")
+    if type(gethui) == "function" then
+        local ok, hui = pcall(gethui)
+        if ok and typeof(hui) == "Instance" then
+            local found = hui:FindFirstChild("STX_Nofitication")
+            if found then
+                return found
+            end
+        end
+    end
+    if type(cloneref) == "function" then
+        local ok, cloned = pcall(cloneref, game:GetService("CoreGui"))
+        if ok and typeof(cloned) == "Instance" then
+            local found = cloned:FindFirstChild("STX_Nofitication")
+            if found then
+                return found
+            end
+        end
+    end
+    local okCore, coreGui = pcall(function()
+        return game:GetService("CoreGui")
+    end)
+    if okCore and coreGui then
+        local found = coreGui:FindFirstChild("STX_Nofitication")
+        if found then
+            return found
+        end
+    end
+    local players = game:GetService("Players")
+    local lp = players.LocalPlayer
+    local playerGui = lp and lp:FindFirstChildOfClass("PlayerGui")
+    return playerGui and playerGui:FindFirstChild("STX_Nofitication") or nil
 end
 
 function Nofitication:DismissAll()
@@ -19,6 +49,9 @@ end
 
 function Nofitication:Notify(nofdebug, middledebug, all)
     local GUI = getNotificationGui()
+    if not GUI then
+        return nil
+    end
     local SelectedType = string.lower(tostring((middledebug and middledebug.Type) or "default"))
     local ambientShadow = Instance.new("ImageLabel")
     local Window = Instance.new("Frame")

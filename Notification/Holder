@@ -4,6 +4,7 @@ if not GUI then
     local STX_NofiticationUIListLayout = Instance.new("UIListLayout")
     STX_Nofitication.Name = "STX_Nofitication"
     STX_Nofitication.Parent = game.CoreGui
+    STX_Nofitication.AutoLocalize = false
     STX_Nofitication.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     STX_Nofitication.ResetOnSpawn = false
     

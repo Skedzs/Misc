@@ -849,6 +849,10 @@ end
   function Custom:Create(Name, Properties, Parent)
     local _instance = Instance.new(Name)
 
+    if _instance:IsA("GuiBase2d") then
+      _instance.AutoLocalize = false
+    end
+
     for i, v in pairs(Properties) do
       _instance[i] = v
     end
@@ -878,6 +882,7 @@ local function OpenClose()
   end
   local ScreenGui = Custom:Create("ScreenGui", {
     Name = "Skedz_SpeedHubX_Logo",
+    AutoLocalize = false,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling
   }, TargetParent)
 
@@ -1017,6 +1022,7 @@ function Speed_Library:SetNotification(Config)
   local Delay = Config[6] or Config.Delay or 5
 
   local NotificationGui = Custom:Create("ScreenGui", {
+    AutoLocalize = false,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
   }, RunService:IsStudio() and Player.PlayerGui or (gethui() or cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui")))
 
@@ -1240,6 +1246,7 @@ function Speed_Library:CreateWindow(Config)
   end
   local SpeedHubXGui = Custom:Create("ScreenGui", {
     Name = "Skedz_SpeedHubX",
+    AutoLocalize = false,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling
   }, TargetParent)
 

@@ -1,16 +1,34 @@
 local Nofitication = {}
+local ActiveHandles = {}
 
-local GUI = game:GetService("CoreGui"):FindFirstChild("STX_Nofitication")
+local function getNotificationGui()
+    return game:GetService("CoreGui"):FindFirstChild("STX_Nofitication")
+end
+
+function Nofitication:DismissAll()
+    local handles = {}
+    for handle in pairs(ActiveHandles) do
+        table.insert(handles, handle)
+    end
+    for _, handle in ipairs(handles) do
+        if type(handle.Dismiss) == "function" then
+            pcall(handle.Dismiss, handle)
+        end
+    end
+end
+
 function Nofitication:Notify(nofdebug, middledebug, all)
-    local SelectedType = string.lower(tostring(middledebug.Type))
+    local GUI = getNotificationGui()
+    local SelectedType = string.lower(tostring((middledebug and middledebug.Type) or "default"))
     local ambientShadow = Instance.new("ImageLabel")
     local Window = Instance.new("Frame")
     local Outline_A = Instance.new("Frame")
     local WindowTitle = Instance.new("TextLabel")
     local WindowDescription = Instance.new("TextLabel")
-    
+
     ambientShadow.Name = "ambientShadow"
     ambientShadow.Parent = GUI
+    ambientShadow.AutoLocalize = false
     ambientShadow.AnchorPoint = Vector2.new(0.5, 0.5)
     ambientShadow.BackgroundTransparency = 1.000
     ambientShadow.BorderSizePixel = 0
@@ -21,25 +39,28 @@ function Nofitication:Notify(nofdebug, middledebug, all)
     ambientShadow.ImageTransparency = 0.400
     ambientShadow.ScaleType = Enum.ScaleType.Slice
     ambientShadow.SliceCenter = Rect.new(10, 10, 118, 118)
-    
+
     Window.Name = "Window"
     Window.Parent = ambientShadow
+    Window.AutoLocalize = false
     Window.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     Window.BorderSizePixel = 0
     Window.Position = UDim2.new(0, 5, 0, 5)
     Window.Size = UDim2.new(0, 230, 0, 80)
     Window.ZIndex = 2
-    
+
     Outline_A.Name = "Outline_A"
     Outline_A.Parent = Window
-    Outline_A.BackgroundColor3 = middledebug.OutlineColor
+    Outline_A.AutoLocalize = false
+    Outline_A.BackgroundColor3 = (middledebug and middledebug.OutlineColor) or Color3.fromRGB(100, 100, 100)
     Outline_A.BorderSizePixel = 0
     Outline_A.Position = UDim2.new(0, 0, 0, 25)
     Outline_A.Size = UDim2.new(0, 230, 0, 2)
     Outline_A.ZIndex = 5
-    
+
     WindowTitle.Name = "WindowTitle"
     WindowTitle.Parent = Window
+    WindowTitle.AutoLocalize = false
     WindowTitle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     WindowTitle.BackgroundTransparency = 1.000
     WindowTitle.BorderColor3 = Color3.fromRGB(27, 42, 53)
@@ -48,13 +69,14 @@ function Nofitication:Notify(nofdebug, middledebug, all)
     WindowTitle.Size = UDim2.new(0, 222, 0, 22)
     WindowTitle.ZIndex = 4
     WindowTitle.Font = Enum.Font.GothamSemibold
-    WindowTitle.Text = nofdebug.Title
+    WindowTitle.Text = (nofdebug and nofdebug.Title) or ""
     WindowTitle.TextColor3 = Color3.fromRGB(220, 220, 220)
     WindowTitle.TextSize = 12.000
     WindowTitle.TextXAlignment = Enum.TextXAlignment.Left
-    
+
     WindowDescription.Name = "WindowDescription"
     WindowDescription.Parent = Window
+    WindowDescription.AutoLocalize = false
     WindowDescription.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     WindowDescription.BackgroundTransparency = 1.000
     WindowDescription.BorderColor3 = Color3.fromRGB(27, 42, 53)
@@ -63,35 +85,66 @@ function Nofitication:Notify(nofdebug, middledebug, all)
     WindowDescription.Size = UDim2.new(0, 216, 0, 40)
     WindowDescription.ZIndex = 4
     WindowDescription.Font = Enum.Font.GothamSemibold
-    WindowDescription.Text = nofdebug.Description
+    WindowDescription.Text = (nofdebug and nofdebug.Description) or ""
     WindowDescription.TextColor3 = Color3.fromRGB(180, 180, 180)
     WindowDescription.TextSize = 12.000
     WindowDescription.TextWrapped = true
     WindowDescription.TextXAlignment = Enum.TextXAlignment.Left
     WindowDescription.TextYAlignment = Enum.TextYAlignment.Top
 
-    if SelectedType == "default" then
-        local function ORBHB_fake_script()
-            local script = Instance.new('LocalScript', ambientShadow)
-        
-            ambientShadow:TweenSize(UDim2.new(0, 240, 0, 90), "Out", "Linear", 0.2)
-            Window.Size = UDim2.new(0, 230, 0, 80)
-            Outline_A:TweenSize(UDim2.new(0, 0, 0, 2), "Out", "Linear", middledebug.Time)
-    
-            wait(middledebug.Time)
-        
-            ambientShadow:TweenSize(UDim2.new(0, 0, 0, 0), "Out", "Linear", 0.2)
-            
-            wait(0.2)
-            ambientShadow:Destroy()
+    local dismissed = false
+    local handle = {
+        Instance = ambientShadow
+    }
+    ActiveHandles[handle] = true
+
+    function handle:Dismiss()
+        if dismissed then
+            return
         end
-        coroutine.wrap(ORBHB_fake_script)()
+        dismissed = true
+        ActiveHandles[handle] = nil
+        if ambientShadow and ambientShadow.Parent then
+            pcall(function()
+                ambientShadow:TweenSize(UDim2.new(0, 0, 0, 0), "Out", "Linear", 0.2, true)
+            end)
+            task.delay(0.2, function()
+                if ambientShadow and ambientShadow.Parent then
+                    ambientShadow:Destroy()
+                end
+            end)
+        end
+    end
+
+    local function scheduleAutoDismiss(duration)
+        task.spawn(function()
+            local total = tonumber(duration) or 5
+            if total > 0 then
+                pcall(function()
+                    Outline_A:TweenSize(UDim2.new(0, 0, 0, 2), "Out", "Linear", total, true)
+                end)
+                local deadline = tick() + total
+                while not dismissed and ambientShadow.Parent and tick() < deadline do
+                    task.wait(0.2)
+                end
+            end
+            if not dismissed then
+                handle:Dismiss()
+            end
+        end)
+    end
+
+    if SelectedType == "default" then
+        ambientShadow:TweenSize(UDim2.new(0, 240, 0, 90), "Out", "Linear", 0.2, true)
+        Window.Size = UDim2.new(0, 230, 0, 80)
+        scheduleAutoDismiss(middledebug and middledebug.Time)
     elseif SelectedType == "image" then
-        ambientShadow:TweenSize(UDim2.new(0, 240, 0, 90), "Out", "Linear", 0.2)
+        ambientShadow:TweenSize(UDim2.new(0, 240, 0, 90), "Out", "Linear", 0.2, true)
         Window.Size = UDim2.new(0, 230, 0, 80)
         WindowTitle.Position = UDim2.new(0, 24, 0, 2)
         local ImageButton = Instance.new("ImageButton")
         ImageButton.Parent = Window
+        ImageButton.AutoLocalize = false
         ImageButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         ImageButton.BackgroundTransparency = 1.000
         ImageButton.BorderSizePixel = 0
@@ -99,30 +152,18 @@ function Nofitication:Notify(nofdebug, middledebug, all)
         ImageButton.Size = UDim2.new(0, 18, 0, 18)
         ImageButton.ZIndex = 5
         ImageButton.AutoButtonColor = false
-        ImageButton.Image = all.Image
-        ImageButton.ImageColor3 = all.ImageColor
-
-        local function ORBHB_fake_script()
-            local script = Instance.new('LocalScript', ambientShadow)
-        
-            Outline_A:TweenSize(UDim2.new(0, 0, 0, 2), "Out", "Linear", middledebug.Time)
-
-            wait(middledebug.Time)
-        
-            ambientShadow:TweenSize(UDim2.new(0, 0, 0, 0), "Out", "Linear", 0.2)
-            
-            wait(0.2)
-            ambientShadow:Destroy()
-        end
-        coroutine.wrap(ORBHB_fake_script)()
+        ImageButton.Image = (all and all.Image) or ""
+        ImageButton.ImageColor3 = (all and all.ImageColor) or Color3.fromRGB(255, 255, 255)
+        scheduleAutoDismiss(middledebug and middledebug.Time)
     elseif SelectedType == "option" then
-        ambientShadow:TweenSize(UDim2.new(0, 240, 0, 110), "Out", "Linear", 0.2)
+        ambientShadow:TweenSize(UDim2.new(0, 240, 0, 110), "Out", "Linear", 0.2, true)
         Window.Size = UDim2.new(0, 230, 0, 100)
         local Uncheck = Instance.new("ImageButton")
         local Check = Instance.new("ImageButton")
-        
+
         Uncheck.Name = "Uncheck"
         Uncheck.Parent = Window
+        Uncheck.AutoLocalize = false
         Uncheck.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         Uncheck.BackgroundTransparency = 1.000
         Uncheck.BorderSizePixel = 0
@@ -132,9 +173,10 @@ function Nofitication:Notify(nofdebug, middledebug, all)
         Uncheck.AutoButtonColor = false
         Uncheck.Image = "http://www.roblox.com/asset/?id=6031094678"
         Uncheck.ImageColor3 = Color3.fromRGB(255, 84, 84)
-        
+
         Check.Name = "Check"
         Check.Parent = Window
+        Check.AutoLocalize = false
         Check.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         Check.BackgroundTransparency = 1.000
         Check.BorderSizePixel = 0
@@ -145,47 +187,34 @@ function Nofitication:Notify(nofdebug, middledebug, all)
         Check.Image = "http://www.roblox.com/asset/?id=6031094667"
         Check.ImageColor3 = Color3.fromRGB(83, 230, 50)
 
-        local function ORBHB_fake_script()
-            local script = Instance.new('LocalScript', ambientShadow)
-        
-            local Stilthere = true
-            local function Unchecked()
-                pcall(function()
+        Uncheck.MouseButton1Click:Connect(function()
+            if dismissed then
+                return
+            end
+            pcall(function()
+                if all and all.Callback then
                     all.Callback(false)
-                end)
-                ambientShadow:TweenSize(UDim2.new(0, 0, 0, 0), "Out", "Linear", 0.2)
-                
-                wait(0.2)
-                ambientShadow:Destroy()
-                Stilthere = false
-            end
-            local function Checked()
-                pcall(function()
-                    all.Callback(true)
-                end)
-                ambientShadow:TweenSize(UDim2.new(0, 0, 0, 0), "Out", "Linear", 0.2)
-                
-                wait(0.2)
-                ambientShadow:Destroy()
-                Stilthere = false
-            end
-            Uncheck.MouseButton1Click:Connect(Unchecked)
-            Check.MouseButton1Click:Connect(Checked)
-            
-            Outline_A:TweenSize(UDim2.new(0, 0, 0, 2), "Out", "Linear", middledebug.Time)
-    
-            wait(middledebug.Time)
+                end
+            end)
+            handle:Dismiss()
+        end)
 
-            if Stilthere == true then
-        
-                ambientShadow:TweenSize(UDim2.new(0, 0, 0, 0), "Out", "Linear", 0.2)
-                
-                wait(0.2)
-                ambientShadow:Destroy()
+        Check.MouseButton1Click:Connect(function()
+            if dismissed then
+                return
             end
-        end
-        coroutine.wrap(ORBHB_fake_script)()
+            pcall(function()
+                if all and all.Callback then
+                    all.Callback(true)
+                end
+            end)
+            handle:Dismiss()
+        end)
+
+        scheduleAutoDismiss(middledebug and middledebug.Time)
     end
+
+    return handle
 end
 
 return Nofitication

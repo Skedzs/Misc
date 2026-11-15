@@ -2118,11 +2118,11 @@ function Speed_Library:CreateWindow(Config)
 
         local Paragraph = Custom:Create("Frame", {
           BackgroundColor3 = Color3.fromRGB(28, 28, 28),
-					BackgroundTransparency = 0.2,
+          BackgroundTransparency = 0.2,
           BorderColor3 = Color3.fromRGB(30, 30, 30),
           BorderSizePixel = 0,
           LayoutOrder = ItemCount,
-          Size = UDim2.new(1, 0, 0, 35),
+          Size = UDim2.new(1, 0, 0, 50),
           Name = "Paragraph",
         }, SectionAdd)
       
@@ -2141,7 +2141,7 @@ function Speed_Library:CreateWindow(Config)
           BackgroundTransparency = 0.999,
           BorderSizePixel = 0,
           Position = UDim2.new(0, 10, 0, 10),
-          Size = UDim2.new(1, -16, 0, 13),
+          Size = UDim2.new(1, -20, 0, 13),
           Name = "ParagraphTitle",
         }, Paragraph)
       
@@ -2150,31 +2150,52 @@ function Speed_Library:CreateWindow(Config)
           Text = Content,
           TextColor3 = Color3.fromRGB(255, 255, 255),
           TextSize = 12,
-          TextTransparency = 0.6,
+          TextTransparency = 0.45,
+          TextWrapped = true,
           TextXAlignment = Enum.TextXAlignment.Left,
-          TextYAlignment = Enum.TextYAlignment.Bottom,
+          TextYAlignment = Enum.TextYAlignment.Top,
           BackgroundTransparency = 0.999,
           BorderSizePixel = 0,
-          Position = UDim2.new(0, 10, 0, 23),
+          Position = UDim2.new(0, 10, 0, 26),
+          Size = UDim2.new(1, -20, 0, 14),
           Name = "ParagraphContent",
         }, Paragraph)
 
+        local TextService = game:GetService("TextService")
         local function UpdateParagraphSize()
-          ParagraphContent.TextWrapped = false
-          local calcX = ParagraphContent.TextBounds.X
-          local sizeX = math.max(1, ParagraphContent.AbsoluteSize.X)
-          local lineCount = math.max(1, math.ceil(calcX / sizeX))
-
-          local newY = 12 + (12 * lineCount)
-          if ParagraphContent.Size.Y.Offset == newY then
-              ParagraphContent.TextWrapped = true
-              return
+          local text = ParagraphContent.Text or ""
+          if text == "" then
+            ParagraphContent.Size = UDim2.new(1, -20, 0, 0)
+            Paragraph.Size = UDim2.new(1, 0, 0, 32)
+            UpdateSizeSection()
+            return
           end
-          
-          ParagraphContent.Size = UDim2.new(1, -16, 0, newY)
-          Paragraph.Size = UDim2.new(1, 0, 0, ParagraphContent.AbsoluteSize.Y + 33)
-          ParagraphContent.TextWrapped = true
 
+          local sizeX = ParagraphContent.AbsoluteSize.X
+          local newY
+          if sizeX > 10 then
+            local ok, bounds = pcall(function()
+              return TextService:GetTextSize(text, ParagraphContent.TextSize, ParagraphContent.Font, Vector2.new(sizeX, 2000))
+            end)
+            if ok and bounds then
+              newY = math.max(14, bounds.Y)
+            end
+          end
+
+          if not newY then
+            local explicitLines = 1
+            for _ in string.gmatch(text, "\n") do
+              explicitLines += 1
+            end
+            newY = 14 * explicitLines
+          end
+
+          if ParagraphContent.Size.Y.Offset == newY and Paragraph.Size.Y.Offset == (newY + 36) then
+            return
+          end
+
+          ParagraphContent.Size = UDim2.new(1, -20, 0, newY)
+          Paragraph.Size = UDim2.new(1, 0, 0, newY + 36)
           UpdateSizeSection()
         end
 
@@ -2182,16 +2203,21 @@ function Speed_Library:CreateWindow(Config)
 
         ParagraphContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateParagraphSize)
 
-        function SettingFuncs:Set(Config)
-          local Title = Config[1] or Config.Title or ""
-          local Content = Config[2] or Config.Content or ""
+        function SettingFuncs:Set(NewConfig)
+          local NewTitle = NewConfig[1] or NewConfig.Title
+          local NewContent = NewConfig[2] or NewConfig.Content
 
-          ParagraphTitle.Text = Title
-          ParagraphContent.Text = Content
+          if NewTitle ~= nil then
+            ParagraphTitle.Text = NewTitle
+          end
+          if NewContent ~= nil then
+            ParagraphContent.Text = NewContent
+          end
 
           UpdateParagraphSize()
         end
 
+        ItemCount += 1
         return SettingFuncs
       end
 
@@ -2540,207 +2566,309 @@ function Speed_Library:CreateWindow(Config)
         local Default = Config[6] or Config.Default or 50
         local Callback = Config[7] or Config.Callback or function() end
 
-				local Funcs_Slider = {Value = Default}
-        
+        if not Increment or Increment <= 0 then
+          Increment = 1
+        end
+
+        local Funcs_Slider = { Value = Default }
+
         local Slider = Custom:Create("Frame", {
-					BackgroundColor3 = Color3.fromRGB(18, 18, 18),
-					BackgroundTransparency = 0.9350000023841858,
-					BorderColor3 = Color3.fromRGB(30, 30, 30),
-					BorderSizePixel = 0,
-					LayoutOrder = ItemCount,
-					Size = UDim2.new(1, 0, 0, 35),
-					Name = "Slider",
-				}, SectionAdd)
+          BackgroundColor3 = Color3.fromRGB(28, 28, 28),
+          BackgroundTransparency = 0.2,
+          BorderColor3 = Color3.fromRGB(30, 30, 30),
+          BorderSizePixel = 0,
+          LayoutOrder = ItemCount,
+          Size = UDim2.new(1, 0, 0, 48),
+          Name = "Slider",
+        }, SectionAdd)
 
         Custom:Create("UICorner", {
           CornerRadius = UDim.new(0, 4),
         }, Slider)
 
-        Custom:Create("TextLabel", {
-					Font = Enum.Font.GothamBold,
-					Text = Title,
-					TextColor3 = Color3.fromRGB(230, 230, 230),
-					TextSize = 13,
-					TextXAlignment = Enum.TextXAlignment.Left,
-					TextYAlignment = Enum.TextYAlignment.Top,
-					BackgroundColor3 = Color3.fromRGB(18, 18, 18),
-					BackgroundTransparency = 0.9990000128746033,
-					BorderColor3 = Color3.fromRGB(30, 30, 30),
-					BorderSizePixel = 0,
-					Position = UDim2.new(0, 10, 0, 10),
-					Size = UDim2.new(1, -180, 0, 13),
-					Name = "SliderTitle",
-				}, Slider)
+        local SliderTitle = Custom:Create("TextLabel", {
+          Font = Enum.Font.GothamBold,
+          Text = Title,
+          TextColor3 = Color3.fromRGB(231, 231, 231),
+          TextSize = 13,
+          TextXAlignment = Enum.TextXAlignment.Left,
+          TextYAlignment = Enum.TextYAlignment.Top,
+          BackgroundColor3 = Color3.fromRGB(18, 18, 18),
+          BackgroundTransparency = 0.999,
+          BorderColor3 = Color3.fromRGB(30, 30, 30),
+          BorderSizePixel = 0,
+          Position = UDim2.new(0, 10, 0, 10),
+          Size = UDim2.new(1, -205, 0, 13),
+          Name = "SliderTitle",
+        }, Slider)
 
-				local SliderContent = Custom:Create("TextLabel", {
-					Font = Enum.Font.GothamBold,
-					Text = Content,
-					TextColor3 = Color3.fromRGB(255, 255, 255),
-					TextSize = 12,
-					TextTransparency = 0.6000000238418579,
-					TextXAlignment = Enum.TextXAlignment.Left,
-					TextYAlignment = Enum.TextYAlignment.Bottom,
-					BackgroundColor3 = Color3.fromRGB(18, 18, 18),
-					BackgroundTransparency = 0.9990000128746033,
-					BorderColor3 = Color3.fromRGB(30, 30, 30),
-					BorderSizePixel = 0,
-					Position = UDim2.new(0, 10, 0, 23),
-					Size = UDim2.new(1, -180, 0, 12),
-					Name = "SliderContent",
-				}, Slider)
+        local SliderContent = Custom:Create("TextLabel", {
+          Font = Enum.Font.GothamBold,
+          Text = Content,
+          TextColor3 = Color3.fromRGB(255, 255, 255),
+          TextSize = 12,
+          TextTransparency = 0.6,
+          TextWrapped = true,
+          TextXAlignment = Enum.TextXAlignment.Left,
+          TextYAlignment = Enum.TextYAlignment.Top,
+          BackgroundColor3 = Color3.fromRGB(18, 18, 18),
+          BackgroundTransparency = 0.999,
+          BorderColor3 = Color3.fromRGB(30, 30, 30),
+          BorderSizePixel = 0,
+          Position = UDim2.new(0, 10, 0, 26),
+          Size = UDim2.new(1, -205, 0, 14),
+          Name = "SliderContent",
+        }, Slider)
 
+        local TextService = game:GetService("TextService")
         local function UpdateSliderSize()
-          SliderContent.TextWrapped = false
-          SliderContent.Size = UDim2.new(1, -180, 0, 12 + (12 * math.floor(SliderContent.TextBounds.X / SliderContent.AbsoluteSize.X)))
-          Slider.Size = UDim2.new(1, 0, 0, SliderContent.AbsoluteSize.Y + 33)
-          SliderContent.TextWrapped = true
+          if Content == "" then
+            SliderContent.Visible = false
+            SliderTitle.Position = UDim2.new(0, 10, 0.5, -7)
+            Slider.Size = UDim2.new(1, 0, 0, 42)
+            UpdateSizeSection()
+            return
+          end
+
+          local sizeX = SliderContent.AbsoluteSize.X
+          local contentHeight = 14
+          if sizeX > 10 then
+            local ok, bounds = pcall(function()
+              return TextService:GetTextSize(Content, SliderContent.TextSize, SliderContent.Font, Vector2.new(sizeX, 1000))
+            end)
+            if ok and bounds then
+              contentHeight = math.max(14, bounds.Y)
+            end
+          end
+
+          local targetHeight = math.max(48, contentHeight + 36)
+          if SliderContent.Size.Y.Offset == contentHeight and Slider.Size.Y.Offset == targetHeight then
+            return
+          end
+
+          SliderContent.Size = UDim2.new(1, -205, 0, contentHeight)
+          Slider.Size = UDim2.new(1, 0, 0, targetHeight)
+          UpdateSizeSection()
         end
 
-        SliderContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-          UpdateSliderSize()
-          UpdateSizeSection()
-        end)
+        SliderContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateSliderSize)
         UpdateSliderSize()
 
         local SliderInput = Custom:Create("Frame", {
-					AnchorPoint = Vector2.new(0, 0.5),
-					BackgroundColor3 = Custom.ColorRGB,
-					BorderColor3 = Color3.fromRGB(30, 30, 30),
-					BorderSizePixel = 0,
-					Position = UDim2.new(1, -155, 0.5, 0),
-					Size = UDim2.new(0, 28, 0, 20),
-					Name = "SliderInput",
-				}, Slider)
+          AnchorPoint = Vector2.new(1, 0.5),
+          BackgroundColor3 = Color3.fromRGB(16, 16, 18),
+          BackgroundTransparency = 0.1,
+          BorderSizePixel = 0,
+          Position = UDim2.new(1, -10, 0.5, 0),
+          Size = UDim2.new(0, 44, 0, 22),
+          Name = "SliderInput",
+        }, Slider)
 
         Custom:Create("UICorner", {
-          CornerRadius = UDim.new(0, 2),
+          CornerRadius = UDim.new(0, 6),
         }, SliderInput)
 
-         
-				local TextBox = Custom:Create("TextBox", {
-					Font = Enum.Font.GothamBold,
-					Text = "90",
-					TextColor3 = Color3.fromRGB(255, 255, 255),
-					TextSize = 13,
-					TextWrapped = true,
-					BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-					BackgroundTransparency = 0.9990000128746033,
-					BorderColor3 = Color3.fromRGB(30, 30, 30),
-					BorderSizePixel = 0,
-					Position = UDim2.new(0, -1, 0, 0),
-					Size = UDim2.new(1, 0, 1, 0),
-				}, SliderInput)
+        local InputStroke = Custom:Create("UIStroke", {
+          Color = Color3.fromRGB(255, 255, 255),
+          Thickness = 1,
+          Transparency = 0.82,
+        }, SliderInput)
+
+        local TextBox = Custom:Create("TextBox", {
+          Font = Enum.Font.GothamBold,
+          Text = tostring(Default),
+          TextColor3 = Color3.fromRGB(242, 242, 246),
+          TextSize = 12,
+          TextXAlignment = Enum.TextXAlignment.Center,
+          ClearTextOnFocus = false,
+          BackgroundTransparency = 1,
+          BorderSizePixel = 0,
+          AnchorPoint = Vector2.new(0.5, 0.5),
+          Position = UDim2.new(0.5, 0, 0.5, 0),
+          Size = UDim2.new(1, -6, 1, 0),
+        }, SliderInput)
+
+        local SliderHit = Custom:Create("Frame", {
+          AnchorPoint = Vector2.new(1, 0.5),
+          BackgroundTransparency = 1,
+          BorderSizePixel = 0,
+          Position = UDim2.new(1, -64, 0.5, 0),
+          Size = UDim2.new(0, 122, 0, 24),
+          Name = "SliderHit",
+        }, Slider)
 
         local SliderFrame = Custom:Create("Frame", {
-					AnchorPoint = Vector2.new(1, 0.5),
-					BackgroundColor3 = Color3.fromRGB(18, 18, 18),
-					BackgroundTransparency = 0.800000011920929,
-					BorderColor3 = Color3.fromRGB(30, 30, 30),
-					BorderSizePixel = 0,
-					Position = UDim2.new(1, -20, 0.5, 0),
-					Size = UDim2.new(0, 100, 0, 3),
-					Name = "SliderFrame",
-				}, Slider)
+          AnchorPoint = Vector2.new(0.5, 0.5),
+          BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+          BackgroundTransparency = 0.84,
+          BorderSizePixel = 0,
+          Position = UDim2.new(0.5, 0, 0.5, 0),
+          Size = UDim2.new(1, 0, 0, 5),
+          Name = "SliderFrame",
+        }, SliderHit)
 
-        Custom:Create("UICorner", {}, SliderFrame)
+        Custom:Create("UICorner", {
+          CornerRadius = UDim.new(1, 0),
+        }, SliderFrame)
+
+        local TrackStroke = Custom:Create("UIStroke", {
+          Color = Color3.fromRGB(255, 255, 255),
+          Thickness = 1,
+          Transparency = 0.9,
+        }, SliderFrame)
 
         local SliderDraggable = Custom:Create("Frame", {
-					AnchorPoint = Vector2.new(0, 0.5),
-					BackgroundColor3 = Custom.ColorRGB,
-					BorderColor3 = Color3.fromRGB(30, 30, 30),
-					BorderSizePixel = 0,
-					Position = UDim2.new(0, 0, 0.5, 0),
-					Size = UDim2.new(0.899999976, 0, 0, 1),
-					Name = "SliderDraggable",
-				}, SliderFrame)
+          AnchorPoint = Vector2.new(0, 0.5),
+          BackgroundColor3 = Custom.ColorRGB,
+          BorderSizePixel = 0,
+          Position = UDim2.new(0, 0, 0.5, 0),
+          Size = UDim2.new(0, 0, 1, 0),
+          Name = "SliderDraggable",
+        }, SliderFrame)
 
-        Custom:Create("UICorner", {}, SliderDraggable)
+        Custom:Create("UICorner", {
+          CornerRadius = UDim.new(1, 0),
+        }, SliderDraggable)
 
         local SliderCircle = Custom:Create("Frame", {
-					AnchorPoint = Vector2.new(1, 0.5),
-					BackgroundColor3 = Custom.ColorRGB,
-					BorderColor3 = Color3.fromRGB(30, 30, 30),
-					BorderSizePixel = 0,
-					Position = UDim2.new(1, 4, 0.5, 0),
-					Size = UDim2.new(0, 8, 0, 8),
-					Name = "SliderCircle",
-				}, SliderDraggable)
+          AnchorPoint = Vector2.new(0.5, 0.5),
+          BackgroundColor3 = Custom.ColorRGB,
+          BorderSizePixel = 0,
+          Position = UDim2.new(0, 0, 0.5, 0),
+          Size = UDim2.new(0, 12, 0, 12),
+          ZIndex = 3,
+          Name = "SliderCircle",
+        }, SliderFrame)
 
-        Custom:Create("UICorner", {}, SliderCircle)
+        Custom:Create("UICorner", {
+          CornerRadius = UDim.new(1, 0),
+        }, SliderCircle)
 
         Custom:Create("UIStroke", {
-          Color = Custom.ColorRGB,
+          Color = Color3.fromRGB(24, 24, 28),
+          Thickness = 2,
+          Transparency = 0.1,
         }, SliderCircle)
 
         local Dragging = false
+        local IsUpdatingText = false
 
         local function Round(Number, Factor)
-          local Result = math.floor(Number / Factor + (math.sign(Number) * 0.5)) * Factor
-          if Result < 0 then 
-            Result = Result + Factor 
+          local Inv = 1 / Factor
+          local Rounded = math.floor(Number * Inv + 0.5) / Inv
+          local Decimals = 0
+          local DotPos = string.find(tostring(Factor), "%.")
+          if DotPos then
+            Decimals = #tostring(Factor) - DotPos
           end
-          return Result
+          return tonumber(string.format("%." .. Decimals .. "f", Rounded)) or Rounded
         end
-        
+
         function Funcs_Slider:Set(Value)
-          Value = math.clamp(Round(Value, Increment), Min, Max)
-          Funcs_Slider.Value = Value
-          TextBox.Text = tostring(Value)
-            
-          TweenService:Create(SliderDraggable, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = UDim2.fromScale((Value - Min) / (Max - Min), 1) }):Play()
+          local Numeric = tonumber(Value)
+          if not Numeric then
+            Numeric = Min
+          end
+          Numeric = math.clamp(Round(Numeric, Increment), Min, Max)
+          Funcs_Slider.Value = Numeric
+
+          IsUpdatingText = true
+          TextBox.Text = tostring(Numeric)
+          IsUpdatingText = false
+
+          local Range = Max - Min
+          local Scale = (Range ~= 0) and math.clamp((Numeric - Min) / Range, 0, 1) or 0
+          local AnimInfo = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+          TweenService:Create(SliderDraggable, AnimInfo, { Size = UDim2.fromScale(Scale, 1) }):Play()
+          TweenService:Create(SliderCircle, AnimInfo, { Position = UDim2.new(Scale, 0, 0.5, 0) }):Play()
         end
-        
-        SliderFrame.InputBegan:Connect(function(Input)
-          if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-            Dragging = true
+
+        local function UpdateFromInputX(InputPosX)
+          local AbsSizeX = math.max(1, SliderFrame.AbsoluteSize.X)
+          local SizeScale = math.clamp((InputPosX - SliderFrame.AbsolutePosition.X) / AbsSizeX, 0, 1)
+          Funcs_Slider:Set(Min + ((Max - Min) * SizeScale))
+        end
+
+        local HoverInfo = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        SliderHit.MouseEnter:Connect(function()
+          TweenService:Create(SliderCircle, HoverInfo, { Size = UDim2.new(0, 14, 0, 14) }):Play()
+          TweenService:Create(SliderFrame, HoverInfo, { BackgroundTransparency = 0.74 }):Play()
+          TweenService:Create(TrackStroke, HoverInfo, { Transparency = 0.8 }):Play()
+        end)
+
+        SliderHit.MouseLeave:Connect(function()
+          if not Dragging then
+            TweenService:Create(SliderCircle, HoverInfo, { Size = UDim2.new(0, 12, 0, 12) }):Play()
+            TweenService:Create(SliderFrame, HoverInfo, { BackgroundTransparency = 0.84 }):Play()
+            TweenService:Create(TrackStroke, HoverInfo, { Transparency = 0.9 }):Play()
           end
         end)
-      
-        SliderFrame.InputEnded:Connect(function(Input)
+
+        SliderHit.InputBegan:Connect(function(Input)
           if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+            Dragging = true
+            UpdateFromInputX(Input.Position.X)
+            TweenService:Create(SliderCircle, HoverInfo, { Size = UDim2.new(0, 14, 0, 14) }):Play()
+            TweenService:Create(InputStroke, HoverInfo, { Transparency = 0.35 }):Play()
+          end
+        end)
+
+        UserInputService.InputEnded:Connect(function(Input)
+          if Dragging and (Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch) then
             Dragging = false
+            TweenService:Create(SliderCircle, HoverInfo, { Size = UDim2.new(0, 12, 0, 12) }):Play()
+            TweenService:Create(SliderFrame, HoverInfo, { BackgroundTransparency = 0.84 }):Play()
+            TweenService:Create(TrackStroke, HoverInfo, { Transparency = 0.9 }):Play()
+            TweenService:Create(InputStroke, HoverInfo, { Transparency = 0.82 }):Play()
             Callback(Funcs_Slider.Value)
           end
         end)
-      
+
         local _LastX = nil
         UserInputService.InputChanged:Connect(function(Input)
-          if Dragging then
+          if Dragging and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
             local CurrPosX = Input.Position.X
             if CurrPosX ~= _LastX then
               _LastX = CurrPosX
-      
-              local SizeScale = math.clamp((CurrPosX - SliderFrame.AbsolutePosition.X) / SliderFrame.AbsoluteSize.X, 0, 1)
-              Funcs_Slider:Set(Min + ((Max - Min) * SizeScale))
+              UpdateFromInputX(CurrPosX)
             end
           end
         end)
-        
+
         TextBox:GetPropertyChangedSignal("Text"):Connect(function()
-          local Valid = TextBox.Text:gsub("[^%d]", "")
-          if Valid ~= "" then
-            local ValidNumber = math.min(tonumber(Valid), Max)
-            TextBox.Text = tostring(ValidNumber)
-          else
-            TextBox.Text = "0"
+          if IsUpdatingText then
+            return
+          end
+          local Raw = TextBox.Text
+          local Pattern = (Increment < 1 or Min < 0) and "[^%d%.%-]" or "[^%d]"
+          local Filtered = Raw:gsub(Pattern, "")
+          if Filtered ~= Raw then
+            IsUpdatingText = true
+            TextBox.Text = Filtered
+            IsUpdatingText = false
           end
         end)
-        
+
+        TextBox.Focused:Connect(function()
+          TweenService:Create(InputStroke, HoverInfo, { Transparency = 0.35 }):Play()
+        end)
+
         TextBox.FocusLost:Connect(function()
-          if TextBox.Text ~= "" then
-            Funcs_Slider:Set(tonumber(TextBox.Text))
+          TweenService:Create(InputStroke, HoverInfo, { Transparency = 0.82 }):Play()
+          local Parsed = tonumber(TextBox.Text)
+          if Parsed then
+            Funcs_Slider:Set(Parsed)
             Callback(Funcs_Slider.Value)
           else
-            Funcs_Slider:Set(0)
-            Callback(Funcs_Slider.Value)
+            Funcs_Slider:Set(Funcs_Slider.Value)
           end
         end)
-        
+
         Funcs_Slider:Set(tonumber(Default))
         Callback(Funcs_Slider.Value)
 
         ItemCount += 1
-				return Funcs_Slider
+        return Funcs_Slider
       end
 
       function Item:AddInput(Config)

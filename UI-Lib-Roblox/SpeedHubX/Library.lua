@@ -1331,7 +1331,8 @@ function Speed_Library:CreateWindow(Config)
 
   -- Initial pop-in animation
   local initTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-  TweenService:Create(MainScale, initTweenInfo, {Scale = 1}):Play()
+  local initTween = TweenService:Create(MainScale, initTweenInfo, {Scale = 1})
+  initTween:Play()
 
 
   local DropShadow = Custom:Create("ImageLabel", {
@@ -1563,13 +1564,21 @@ function Speed_Library:CreateWindow(Config)
 
   local function RecalcTabHeight()
     if type(CountTab) ~= "number" or CountTab <= 0 then return end
-    local available = ScrollTab.AbsoluteSize.Y
+    local currentScale = MainScale and MainScale.Scale or 1
+    if not DropShadowHolder.Visible or currentScale < 0.95 then return end
+
+    local available = math.floor((ScrollTab.AbsoluteSize.Y / currentScale) + 0.5)
     if not available or available <= 0 then return end
 
     if CountTab * 33 <= available then
       TabHeight = 33
     else
       TabHeight = math.max(22, math.floor((available - (CountTab - 1) * 3) / CountTab))
+    end
+
+    local activeOrder = 0
+    if LayersPageLayout and LayersPageLayout.CurrentPage then
+      activeOrder = tonumber(LayersPageLayout.CurrentPage.LayoutOrder) or 0
     end
 
     for _, child in pairs(ScrollTab:GetChildren()) do
@@ -1584,7 +1593,7 @@ function Speed_Library:CreateWindow(Config)
           end
         end
         if chooseFrame then
-          chooseFrame.Position = UDim2.new(0, 2, 0, math.floor(TabHeight * 0.3))
+          chooseFrame.Position = UDim2.new(0, 2, 0, math.floor(TabHeight * 0.3) + (TabHeight + 3) * activeOrder)
           chooseFrame.Size = UDim2.new(0, 1, 0, math.floor(TabHeight * 0.4))
         end
       end
@@ -1596,24 +1605,42 @@ function Speed_Library:CreateWindow(Config)
   ScrollTab.ChildAdded:Connect(UpdateSize)
   ScrollTab.ChildRemoved:Connect(UpdateSize)
   ScrollTab:GetPropertyChangedSignal("AbsoluteSize"):Connect(RecalcTabHeight)
+  initTween.Completed:Connect(function(state)
+    if state == Enum.PlaybackState.Completed then
+      RecalcTabHeight()
+    end
+  end)
+
+  local function closeWindow()
+    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+    local tween = TweenService:Create(MainScale, tweenInfo, {Scale = 0})
+    tween:Play()
+    tween.Completed:Connect(function(state)
+      if state ~= Enum.PlaybackState.Completed then return end
+      DropShadowHolder.Visible = false
+      if not Open_Close.Visible then Open_Close.Visible = true end
+    end)
+  end
+
+  local function openWindow()
+    DropShadowHolder.Visible = true
+    local tweenInfo = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    local openTween = TweenService:Create(MainScale, tweenInfo, {Scale = 1})
+    openTween:Play()
+    openTween.Completed:Connect(function(state)
+      if state == Enum.PlaybackState.Completed then
+        RecalcTabHeight()
+      end
+    end)
+    if Open_Close.Visible then Open_Close.Visible = false end
+  end
 
   Min.Activated:Connect(function()
-		CircleClick(Min, Player:GetMouse().X, Player:GetMouse().Y)
-		local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-		local tween = TweenService:Create(MainScale, tweenInfo, {Scale = 0})
-		tween:Play()
-		tween.Completed:Connect(function()
-			DropShadowHolder.Visible = false
-			if not Open_Close.Visible then Open_Close.Visible = true end
-		end)
-	end)
+    CircleClick(Min, Player:GetMouse().X, Player:GetMouse().Y)
+    closeWindow()
+  end)
 
-  Open_Close.Activated:Connect(function()
-		DropShadowHolder.Visible = true
-		local tweenInfo = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-		TweenService:Create(MainScale, tweenInfo, {Scale = 1}):Play()
-		if Open_Close.Visible then Open_Close.Visible = false end
-	end)
+  Open_Close.Activated:Connect(openWindow)
 
 
   local ConfirmationOverlay = Custom:Create("Frame", {
@@ -3408,18 +3435,9 @@ function Speed_Library:CreateWindow(Config)
 
   function Tabs:ToggleUI()
       if DropShadowHolder.Visible then
-          local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-          local tween = TweenService:Create(MainScale, tweenInfo, {Scale = 0})
-          tween:Play()
-          tween.Completed:Connect(function()
-              DropShadowHolder.Visible = false
-              if not Open_Close.Visible then Open_Close.Visible = true end
-          end)
+          closeWindow()
       else
-          DropShadowHolder.Visible = true
-          local tweenInfo = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-          TweenService:Create(MainScale, tweenInfo, {Scale = 1}):Play()
-          if Open_Close.Visible then Open_Close.Visible = false end
+          openWindow()
       end
   end
 

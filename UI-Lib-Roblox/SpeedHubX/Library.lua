@@ -31,8 +31,9 @@ local function GetSafeGuiParent()
   return Player:WaitForChild("PlayerGui")
 end
 
-local function ResizeItemContent(itemFrame, contentLabel, widthOffset, minHeight)
-  local sizeX = contentLabel.AbsoluteSize.X
+local function ResizeItemContent(itemFrame, contentLabel, widthOffset, minHeight, uiScale)
+  local scale = (type(uiScale) == "number" and uiScale > 0) and uiScale or 1
+  local sizeX = contentLabel.AbsoluteSize.X / scale
   local targetHeight = minHeight or 12
   local text = contentLabel.Text or ""
   if text ~= "" and sizeX > 10 then
@@ -1605,35 +1606,231 @@ function Speed_Library:CreateWindow(Config)
     UpdateSize()
   end
 
+  local isWindowOpen = true
+  local isRestoringScroll = false
+  local activeWindowTween = initTween
+  local windowAnimConn = nil
+  local trackedScrollFrames = {}
+
+  local function getReadyScale()
+    if not DropShadowHolder.Visible then return nil end
+    local currentScale = MainScale and MainScale.Scale or 1
+    if currentScale < 0.95 then return nil end
+    return currentScale
+  end
+
+  local function bindItemResize(itemFrame, contentLabel, widthOffset, minHeight, onResized)
+    ResizeItemContent(itemFrame, contentLabel, widthOffset, minHeight, getReadyScale())
+    contentLabel:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+      local scale = getReadyScale()
+      if not scale then return end
+      if ResizeItemContent(itemFrame, contentLabel, widthOffset, minHeight, scale) then
+        onResized()
+      end
+    end)
+  end
+
+  local function getMaxScroll(scrollFrame)
+    return Vector2.new(
+      math.max(0, scrollFrame.AbsoluteCanvasSize.X - scrollFrame.AbsoluteWindowSize.X),
+      math.max(0, scrollFrame.AbsoluteCanvasSize.Y - scrollFrame.AbsoluteWindowSize.Y)
+    )
+  end
+
+  local function captureScrollState(scrollFrame, entry)
+    local currentScale = MainScale and MainScale.Scale or 1
+    if not isWindowOpen or isRestoringScroll or not DropShadowHolder.Visible or currentScale < 0.98 then
+      return
+    end
+    local pos = scrollFrame.CanvasPosition
+    local maxScroll = getMaxScroll(scrollFrame)
+    if currentScale ~= 1 and currentScale > 0 then
+      pos = pos / currentScale
+      maxScroll = maxScroll / currentScale
+    end
+    entry.pos = pos
+    entry.maxScroll = maxScroll
+  end
+
+  local function snapshotAllScrollStates()
+    for scrollFrame, entry in pairs(trackedScrollFrames) do
+      if scrollFrame and scrollFrame.Parent then
+        captureScrollState(scrollFrame, entry)
+      end
+    end
+  end
+
+  local function refreshAllScrollFrames()
+    for scrollFrame, entry in pairs(trackedScrollFrames) do
+      if scrollFrame and scrollFrame.Parent and entry.refreshFn then
+        entry.refreshFn()
+      end
+    end
+  end
+
+  local function applyProportionalScroll()
+    local wasRestoring = isRestoringScroll
+    isRestoringScroll = true
+    local currentScale = MainScale and MainScale.Scale or 1
+    for scrollFrame, entry in pairs(trackedScrollFrames) do
+      if scrollFrame and scrollFrame.Parent then
+        local savedPos = entry.pos
+        if savedPos.X > 0 or savedPos.Y > 0 then
+          local curMax = getMaxScroll(scrollFrame)
+          local targetX = 0
+          local targetY = 0
+          if entry.maxScroll.X > 0 then
+            targetX = (savedPos.X / entry.maxScroll.X) * curMax.X
+          elseif savedPos.X > 0 and currentScale > 0 then
+            targetX = savedPos.X * currentScale
+          end
+          if entry.maxScroll.Y > 0 then
+            targetY = (savedPos.Y / entry.maxScroll.Y) * curMax.Y
+          elseif savedPos.Y > 0 and currentScale > 0 then
+            targetY = savedPos.Y * currentScale
+          end
+          scrollFrame.CanvasPosition = Vector2.new(targetX, targetY)
+        end
+      end
+    end
+    isRestoringScroll = wasRestoring
+  end
+
+  local function applyExactScroll()
+    local wasRestoring = isRestoringScroll
+    isRestoringScroll = true
+    for scrollFrame, entry in pairs(trackedScrollFrames) do
+      if scrollFrame and scrollFrame.Parent then
+        scrollFrame.CanvasPosition = entry.pos
+      end
+    end
+    isRestoringScroll = wasRestoring
+  end
+
+  local function stopWindowAnimTracking()
+    if windowAnimConn then
+      windowAnimConn:Disconnect()
+      windowAnimConn = nil
+    end
+  end
+
+  local function startWindowAnimTracking()
+    stopWindowAnimTracking()
+    windowAnimConn = RunService.RenderStepped:Connect(function()
+      if not DropShadowHolder or not DropShadowHolder.Parent then
+        stopWindowAnimTracking()
+        return
+      end
+      if not DropShadowHolder.Visible then return end
+      applyProportionalScroll()
+    end)
+  end
+
+  local function registerScrollFrame(scrollFrame, refreshFn)
+    local entry = {
+      frame = scrollFrame,
+      pos = scrollFrame.CanvasPosition,
+      maxScroll = getMaxScroll(scrollFrame),
+      refreshFn = refreshFn
+    }
+    trackedScrollFrames[scrollFrame] = entry
+
+    scrollFrame:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+      captureScrollState(scrollFrame, entry)
+    end)
+
+    scrollFrame.Destroying:Connect(function()
+      trackedScrollFrames[scrollFrame] = nil
+    end)
+  end
+
+  local function resetScrollState(scrollFrame)
+    local entry = trackedScrollFrames[scrollFrame]
+    if entry then
+      entry.pos = Vector2.new(0, 0)
+      entry.maxScroll = Vector2.new(0, 0)
+    end
+  end
+
+  SpeedHubXGui.Destroying:Connect(stopWindowAnimTracking)
+
   ScrollTab.ChildAdded:Connect(UpdateSize)
   ScrollTab.ChildRemoved:Connect(UpdateSize)
   ScrollTab:GetPropertyChangedSignal("AbsoluteSize"):Connect(RecalcTabHeight)
+  registerScrollFrame(ScrollTab, UpdateSize)
   initTween.Completed:Connect(function(state)
+    if activeWindowTween == initTween then
+      activeWindowTween = nil
+    end
     if state == Enum.PlaybackState.Completed then
       RecalcTabHeight()
+      refreshAllScrollFrames()
     end
   end)
 
   local function closeWindow()
+    if not isWindowOpen and not DropShadowHolder.Visible then return end
+    if isWindowOpen then
+      snapshotAllScrollStates()
+    end
+    isWindowOpen = false
+    isRestoringScroll = true
+    if activeWindowTween then
+      pcall(function()
+        activeWindowTween:Cancel()
+      end)
+      activeWindowTween = nil
+    end
     local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-    local tween = TweenService:Create(MainScale, tweenInfo, {Scale = 0})
-    tween:Play()
-    tween.Completed:Connect(function(state)
+    local closeTween = TweenService:Create(MainScale, tweenInfo, {Scale = 0})
+    activeWindowTween = closeTween
+    startWindowAnimTracking()
+    closeTween:Play()
+    closeTween.Completed:Connect(function(state)
+      if activeWindowTween ~= closeTween then return end
+      activeWindowTween = nil
+      stopWindowAnimTracking()
       if state ~= Enum.PlaybackState.Completed then return end
       DropShadowHolder.Visible = false
+      isRestoringScroll = false
       if not Open_Close.Visible then Open_Close.Visible = true end
     end)
   end
 
   local function openWindow()
+    if isWindowOpen and DropShadowHolder.Visible then return end
+    isWindowOpen = true
+    isRestoringScroll = true
+    if activeWindowTween then
+      pcall(function()
+        activeWindowTween:Cancel()
+      end)
+      activeWindowTween = nil
+    end
     DropShadowHolder.Visible = true
     local tweenInfo = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
     local openTween = TweenService:Create(MainScale, tweenInfo, {Scale = 1})
+    activeWindowTween = openTween
+    startWindowAnimTracking()
     openTween:Play()
     openTween.Completed:Connect(function(state)
-      if state == Enum.PlaybackState.Completed then
+      if activeWindowTween ~= openTween then return end
+      activeWindowTween = nil
+      stopWindowAnimTracking()
+      if state ~= Enum.PlaybackState.Completed then return end
+      RecalcTabHeight()
+      refreshAllScrollFrames()
+      applyExactScroll()
+      local postConn
+      postConn = RunService.RenderStepped:Connect(function()
+        postConn:Disconnect()
+        if not DropShadowHolder or not DropShadowHolder.Parent then return end
+        if not isWindowOpen or activeWindowTween ~= nil then return end
         RecalcTabHeight()
-      end
+        refreshAllScrollFrames()
+        applyExactScroll()
+        isRestoringScroll = false
+      end)
     end)
     if Open_Close.Visible then Open_Close.Visible = false end
   end
@@ -1918,6 +2115,8 @@ function Speed_Library:CreateWindow(Config)
       SortOrder = Enum.SortOrder.LayoutOrder,
       Parent = ScrolLayers
     })
+
+    registerScrollFrame(ScrolLayers)
 
     local Tab = Custom:Create("Frame", {
 			BackgroundColor3 = Color3.fromRGB(18, 18, 18),
@@ -2275,6 +2474,7 @@ function Speed_Library:CreateWindow(Config)
           Name = "ParagraphContent",
         }, Paragraph)
 
+        local lastParagraphWidth = 0
         local function UpdateParagraphSize()
           local text = ParagraphContent.Text or ""
           if text == "" then
@@ -2284,7 +2484,11 @@ function Speed_Library:CreateWindow(Config)
             return
           end
 
-          local sizeX = ParagraphContent.AbsoluteSize.X
+          local scale = getReadyScale()
+          local sizeX = scale and (ParagraphContent.AbsoluteSize.X / scale) or lastParagraphWidth
+          if sizeX > 10 then
+            lastParagraphWidth = sizeX
+          end
           local newY
           if sizeX > 10 then
             local ok, bounds = pcall(function()
@@ -2314,7 +2518,11 @@ function Speed_Library:CreateWindow(Config)
 
         UpdateParagraphSize()
 
-        ParagraphContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateParagraphSize)
+        ParagraphContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+          if getReadyScale() then
+            UpdateParagraphSize()
+          end
+        end)
 
         function SettingFuncs:Set(NewConfig)
           local NewTitle = NewConfig[1] or NewConfig.Title
@@ -2465,13 +2673,7 @@ function Speed_Library:CreateWindow(Config)
 				}, Button)
 
         ButtonContent.TextWrapped = true
-        ResizeItemContent(Button, ButtonContent, -100, 12)
-
-        ButtonContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-          if ResizeItemContent(Button, ButtonContent, -100, 12) then
-            UpdateSizeSection()
-          end
-        end)
+        bindItemResize(Button, ButtonContent, -100, 12, UpdateSizeSection)
 
         local ButtonButton = Custom:Create("TextButton", {
 					Name = "ButtonButton",
@@ -2569,13 +2771,7 @@ function Speed_Library:CreateWindow(Config)
 				}, Toggle)
 				
         ToggleContent.TextWrapped = true
-        ResizeItemContent(Toggle, ToggleContent, -100, 12)
-
-        ToggleContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-          if ResizeItemContent(Toggle, ToggleContent, -100, 12) then
-            UpdateSizeSection()
-          end
-        end)
+        bindItemResize(Toggle, ToggleContent, -100, 12, UpdateSizeSection)
 
         local ToggleButton = Custom:Create("TextButton", {
           Name = "ToggleButton",
@@ -2718,6 +2914,7 @@ function Speed_Library:CreateWindow(Config)
           Name = "SliderContent",
         }, Slider)
 
+        local lastSliderWidth = 0
         local function UpdateSliderSize()
           if Content == "" then
             SliderContent.Visible = false
@@ -2727,7 +2924,11 @@ function Speed_Library:CreateWindow(Config)
             return
           end
 
-          local sizeX = SliderContent.AbsoluteSize.X
+          local scale = getReadyScale()
+          local sizeX = scale and (SliderContent.AbsoluteSize.X / scale) or lastSliderWidth
+          if sizeX > 10 then
+            lastSliderWidth = sizeX
+          end
           local contentHeight = 14
           if sizeX > 10 then
             local ok, bounds = pcall(function()
@@ -2748,7 +2949,11 @@ function Speed_Library:CreateWindow(Config)
           UpdateSizeSection()
         end
 
-        SliderContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(UpdateSliderSize)
+        SliderContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+          if getReadyScale() then
+            UpdateSliderSize()
+          end
+        end)
         UpdateSliderSize()
 
         local SliderInput = Custom:Create("Frame", {
@@ -3026,13 +3231,7 @@ function Speed_Library:CreateWindow(Config)
           Parent = Input
         })
 
-        ResizeItemContent(Input, InputContent, -180, 12)
-
-        InputContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-          if ResizeItemContent(Input, InputContent, -180, 12) then
-            UpdateSizeSection()
-          end
-        end)
+        bindItemResize(Input, InputContent, -180, 12, UpdateSizeSection)
 
         local InputFrame = Custom:Create("Frame", {
           AnchorPoint = Vector2.new(1, 0.5),
@@ -3160,13 +3359,7 @@ function Speed_Library:CreateWindow(Config)
         })
         
         DropdownContent.TextWrapped = true
-        ResizeItemContent(Dropdown, DropdownContent, -180, 12)
-
-        DropdownContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-          if ResizeItemContent(Dropdown, DropdownContent, -180, 12) then
-            UpdateSizeSection()
-          end
-        end)
+        bindItemResize(Dropdown, DropdownContent, -180, 12, UpdateSizeSection)
 
         local SelectOptionsFrame = Custom:Create("Frame", {
           AnchorPoint = Vector2.new(1, 0.5),
@@ -3252,11 +3445,14 @@ function Speed_Library:CreateWindow(Config)
         }, ScrollSelect)
 
         local function UpdateCanvasSize()
-          local contentY = DropListLayout.AbsoluteContentSize.Y
+          local scale = getReadyScale()
+          if not scale then return end
+          local contentY = math.floor((DropListLayout.AbsoluteContentSize.Y / scale) + 0.5)
           ScrollSelect.CanvasSize = UDim2.new(0, 0, 0, contentY + 6)
         end
 
         DropListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateCanvasSize)
+        registerScrollFrame(ScrollSelect, UpdateCanvasSize)
 
         local SearchBar = Custom:Create("TextBox", {
           Font = Enum.Font.GothamBold,
@@ -3287,6 +3483,7 @@ function Speed_Library:CreateWindow(Config)
           end
 
           ScrollSelect.CanvasPosition = Vector2.new(0, 0)
+          resetScrollState(ScrollSelect)
           UpdateCanvasSize()
         end)
 
@@ -3302,6 +3499,8 @@ function Speed_Library:CreateWindow(Config)
             end
           end
           DropCount = 0
+          ScrollSelect.CanvasPosition = Vector2.new(0, 0)
+          resetScrollState(ScrollSelect)
           UpdateCanvasSize()
         end
         
@@ -3446,7 +3645,7 @@ function Speed_Library:CreateWindow(Config)
   end
 
   function Tabs:ToggleUI()
-      if DropShadowHolder.Visible then
+      if isWindowOpen then
           closeWindow()
       else
           openWindow()

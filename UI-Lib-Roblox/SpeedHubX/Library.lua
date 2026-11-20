@@ -1525,7 +1525,10 @@ function Speed_Library:CreateWindow(Config)
     Name = "LayersPageLayout",
     TweenTime = 0.5,
     EasingDirection = Enum.EasingDirection.InOut,
-    EasingStyle = Enum.EasingStyle.Quad
+    EasingStyle = Enum.EasingStyle.Quad,
+    ScrollWheelInputEnabled = false,
+    TouchInputEnabled = false,
+    GamepadInputEnabled = false
   }, LayersFolder)
 
   local ScrollTab = Custom:Create("ScrollingFrame", {
@@ -1862,6 +1865,7 @@ function Speed_Library:CreateWindow(Config)
 		BackgroundTransparency = 0.999,
 		BorderColor3 = Color3.fromRGB(30, 30, 30),
 		BorderSizePixel = 0,
+		ClipsDescendants = true,
 		LayoutOrder = 1,
 		Position = UDim2.new(0.5, 0, 0.5, 0),
 		Size = UDim2.new(1, -10, 1, -10),
@@ -1878,7 +1882,11 @@ function Speed_Library:CreateWindow(Config)
     EasingDirection = Enum.EasingDirection.InOut,
     EasingStyle = Enum.EasingStyle.Quad,
     TweenTime = 0.01,
+    Padding = UDim.new(0, 16),
     SortOrder = Enum.SortOrder.LayoutOrder,
+    ScrollWheelInputEnabled = false,
+    TouchInputEnabled = false,
+    GamepadInputEnabled = false,
     Archivable = false,
     Name = "DropPageLayout",
     Parent = DropdownFolder
@@ -3223,8 +3231,11 @@ function Speed_Library:CreateWindow(Config)
 
         local ScrollSelect = Custom:Create("ScrollingFrame", {
           CanvasSize = UDim2.new(0, 0, 0, 0),
-          ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0),
-          ScrollBarThickness = 0,
+          ScrollBarImageColor3 = Color3.fromRGB(220, 220, 225),
+          ScrollBarImageTransparency = 0.35,
+          ScrollBarThickness = 2,
+          VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar,
+          ClipsDescendants = true,
           Active = true,
           LayoutOrder = CountDropdown,
           BackgroundColor3 = Color3.fromRGB(18, 18, 18),
@@ -3235,10 +3246,17 @@ function Speed_Library:CreateWindow(Config)
           Name = "ScrollSelect",
         }, DropdownFolder)
 
-        Custom:Create("UIListLayout", {
+        local DropListLayout = Custom:Create("UIListLayout", {
           Padding = UDim.new(0, 3),
           SortOrder = Enum.SortOrder.LayoutOrder,
         }, ScrollSelect)
+
+        local function UpdateCanvasSize()
+          local contentY = DropListLayout.AbsoluteContentSize.Y
+          ScrollSelect.CanvasSize = UDim2.new(0, 0, 0, contentY + 6)
+        end
+
+        DropListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(UpdateCanvasSize)
 
         local SearchBar = Custom:Create("TextBox", {
           Font = Enum.Font.GothamBold,
@@ -3247,6 +3265,7 @@ function Speed_Library:CreateWindow(Config)
           Text = "",
           TextColor3 = Color3.fromRGB(255, 255, 255),
           TextSize = 12,
+          LayoutOrder = -1,
           BackgroundColor3 = Color3.fromRGB(0, 0, 0),
           BackgroundTransparency = 0.8,
           BorderColor3 = Color3.fromRGB(40, 40, 40),
@@ -3266,6 +3285,9 @@ function Speed_Library:CreateWindow(Config)
               end
             end
           end
+
+          ScrollSelect.CanvasPosition = Vector2.new(0, 0)
+          UpdateCanvasSize()
         end)
 
         local DropCount = 0
@@ -3279,6 +3301,8 @@ function Speed_Library:CreateWindow(Config)
               DropFrame:Destroy()
             end
           end
+          DropCount = 0
+          UpdateCanvasSize()
         end
         
         function Funcs_Dropdown:Set(Value)
@@ -3385,18 +3409,6 @@ function Speed_Library:CreateWindow(Config)
 
             Funcs_Dropdown:Set(Funcs_Dropdown.Value)
           end)
-        
-          local function UpdateCanvasSize()
-            local OffsetY = 0
-
-            for _, child in ipairs(ScrollSelect:GetChildren()) do
-              if child.Name ~= "UIListLayout" and child.Name ~= "SearchBar" then
-                OffsetY = OffsetY + 5 + child.Size.Y.Offset
-              end
-            end
-
-            ScrollSelect.CanvasSize = UDim2.new(0, 0, 0, OffsetY)
-          end
         
           UpdateCanvasSize()
 

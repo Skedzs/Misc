@@ -1533,8 +1533,9 @@ function Speed_Library:CreateWindow(Config)
   }, LayersFolder)
 
   local ScrollTab = Custom:Create("ScrollingFrame", {
-    CanvasSize = UDim2.new(0, 0, 2.10000002, 0),
+    CanvasSize = UDim2.new(0, 0, 0, 0),
     ScrollBarImageColor3 = Color3.fromRGB(0, 0, 0),
+    ScrollBarImageTransparency = 1,
     ScrollBarThickness = 0,
     Active = true,
     BackgroundColor3 = Color3.fromRGB(18, 18, 18),
@@ -1555,15 +1556,21 @@ function Speed_Library:CreateWindow(Config)
   local CountDropdown = 0
 
   local function UpdateSize()
-    local _Total = 0
+    local totalHeight = 0
+    local itemCount = 0
 
     for _, v in pairs(ScrollTab:GetChildren()) do
       if v:IsA("GuiObject") and v.Name ~= "UIListLayout" then
-        _Total = _Total + 3 + v.Size.Y.Offset
+        totalHeight = totalHeight + v.Size.Y.Offset
+        itemCount = itemCount + 1
       end
     end
 
-    ScrollTab.CanvasSize = UDim2.new(0, 0, 0, _Total)
+    if itemCount > 1 then
+      totalHeight = totalHeight + (itemCount - 1) * 3
+    end
+
+    ScrollTab.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
   end
 
   local function RecalcTabHeight()
@@ -1700,7 +1707,7 @@ function Speed_Library:CreateWindow(Config)
     local wasRestoring = isRestoringScroll
     isRestoringScroll = true
     for scrollFrame, entry in pairs(trackedScrollFrames) do
-      if scrollFrame and scrollFrame.Parent then
+      if scrollFrame and scrollFrame.Parent and scrollFrame.CanvasPosition ~= entry.pos then
         scrollFrame.CanvasPosition = entry.pos
       end
     end
@@ -2098,6 +2105,7 @@ function Speed_Library:CreateWindow(Config)
     
     local ScrolLayers = Custom:Create("ScrollingFrame", {
 			ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80),
+			ScrollBarImageTransparency = 1,
 			ScrollBarThickness = 0,
 			Active = true,
 			LayoutOrder = CountTab,

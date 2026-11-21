@@ -2226,7 +2226,7 @@ function Speed_Library:CreateWindow(Config)
   local DropdownSelect = Custom:Create("Frame", {
     AnchorPoint = Vector2.new(1, 0.5),
     BackgroundColor3 = Color3.fromRGB(20, 20, 24),
-    BackgroundTransparency = 0.03,
+    BackgroundTransparency = 0,
     BorderColor3 = Color3.fromRGB(30, 30, 30),
     BorderSizePixel = 0,
     LayoutOrder = 1,
@@ -2275,7 +2275,7 @@ function Speed_Library:CreateWindow(Config)
 		ClipsDescendants = true,
 		LayoutOrder = 1,
 		Position = UDim2.new(0.5, 0, 0.5, 0),
-		Size = UDim2.new(1, -10, 1, -10),
+		Size = UDim2.new(1, -12, 1, -12),
 		Name = "DropdownSelectReal",
 		Parent = DropdownSelect
 	})
@@ -3673,10 +3673,10 @@ function Speed_Library:CreateWindow(Config)
         }, ScrollSelect)
 
         local searchPillStroke = Custom:ApplyPillStyle(SearchBar, 5)
-        SearchBar.BackgroundColor3 = Color3.fromRGB(13, 13, 15)
-        SearchBar.BackgroundTransparency = 0.08
+        SearchBar.BackgroundColor3 = Color3.fromRGB(14, 14, 17)
+        SearchBar.BackgroundTransparency = 0
         Custom:Create("UIPadding", {
-          PaddingLeft = UDim.new(0, 8),
+          PaddingLeft = UDim.new(0, 10),
           PaddingRight = UDim.new(0, 8),
         }, SearchBar)
         SearchBar.Focused:Connect(function()
@@ -3792,8 +3792,8 @@ function Speed_Library:CreateWindow(Config)
             BackgroundTransparency = 0.999,
             BorderColor3 = Color3.fromRGB(30, 30, 30),
             BorderSizePixel = 0,
-            Position = UDim2.new(0, 8, 0, 0),
-            Size = UDim2.new(1, -14, 1, 0),
+            Position = UDim2.new(0, 16, 0, 0),
+            Size = UDim2.new(1, -22, 1, 0),
             Name = "OptionText"
           }, Option)
 
@@ -3810,7 +3810,7 @@ function Speed_Library:CreateWindow(Config)
             end
           end)
 
-          local lastOptWidth = 134
+          local lastOptWidth = 124
           local function UpdateOptionSize()
             local scale = getReadyScale()
             local availW = scale and (OptionText.AbsoluteSize.X / scale) or lastOptWidth
@@ -3840,14 +3840,14 @@ function Speed_Library:CreateWindow(Config)
             BackgroundColor3 = Custom.ColorRGB,
             BorderColor3 = Color3.fromRGB(30, 30, 30),
             BorderSizePixel = 0,
-            Position = UDim2.new(0, 2, 0.5, 0),
+            Position = UDim2.new(0, 5, 0.5, 0),
             Size = UDim2.new(0, 0, 0, 0),
             Name = "ChooseFrame"
           }, Option)
   
           Custom:Create("UIStroke", {
             Color = Custom.ColorRGB,
-            Thickness = 1.2,
+            Thickness = 1,
             Transparency = 0.999
           }, ChooseFrame)
   

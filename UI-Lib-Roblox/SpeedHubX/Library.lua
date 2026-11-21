@@ -31,27 +31,109 @@ local function GetSafeGuiParent()
   return Player:WaitForChild("PlayerGui")
 end
 
-local function ResizeItemContent(itemFrame, contentLabel, widthOffset, minHeight, uiScale)
-  local scale = (type(uiScale) == "number" and uiScale > 0) and uiScale or 1
-  local sizeX = contentLabel.AbsoluteSize.X / scale
-  local targetHeight = minHeight or 12
-  local text = contentLabel.Text or ""
-  if text ~= "" and sizeX > 10 then
-    local ok, bounds = pcall(function()
-      return TextService:GetTextSize(text, contentLabel.TextSize, contentLabel.Font, Vector2.new(sizeX, 1000))
-    end)
-    if ok and bounds then
-      targetHeight = math.max(minHeight or 12, bounds.Y)
+local function MeasureTextSize(text, textSize, font, maxWidth)
+  if type(text) ~= "string" or text == "" then
+    return Vector2.new(0, 0)
+  end
+  local width = math.max(10, maxWidth or 2000)
+  local ok, bounds = pcall(function()
+    return TextService:GetTextSize(text, textSize, font, Vector2.new(width, 2000))
+  end)
+  if ok and bounds then
+    return bounds
+  end
+  return nil
+end
+
+local function CountExplicitLines(text)
+  if type(text) ~= "string" or text == "" then
+    return 0
+  end
+  local lines = 1
+  for _ in string.gmatch(text, "\n") do
+    lines += 1
+  end
+  return lines
+end
+
+local function ResizeCardItem(itemFrame, titleLabel, contentLabel, opts)
+  local scale = (type(opts.uiScale) == "number" and opts.uiScale > 0) and opts.uiScale or 1
+  local widthOffset = opts.widthOffset or -100
+  local minContentH = opts.minContentHeight or 12
+  local contentGap = opts.contentGap or 0
+  local minFrameH = opts.minFrameHeight or 0
+  local extraHeight = opts.extraHeight or 0
+  local fallbackWidth = opts.fallbackWidth or 0
+
+  local rawX = contentLabel.AbsoluteSize.X / scale
+  if rawX <= 10 then
+    rawX = titleLabel.AbsoluteSize.X / scale
+  end
+  if rawX <= 10 then
+    rawX = fallbackWidth
+  end
+  if rawX > 10 and opts.onMeasuredWidth then
+    opts.onMeasuredWidth(rawX)
+  end
+
+  local titleText = titleLabel.Text or ""
+  local titleH = 13
+  if titleText ~= "" then
+    if rawX > 10 then
+      local bounds = MeasureTextSize(titleText, titleLabel.TextSize, titleLabel.Font, rawX)
+      if bounds then
+        titleH = math.max(13, bounds.Y)
+      end
+    else
+      titleH = math.max(13, 13 * CountExplicitLines(titleText))
     end
   end
 
-  local frameHeight = targetHeight + 33
-  if contentLabel.Size.Y.Offset == targetHeight and itemFrame.Size.Y.Offset == frameHeight then
+  local contentText = contentLabel.Text or ""
+  local contentH = minContentH
+  if contentText ~= "" then
+    if rawX > 10 then
+      local bounds = MeasureTextSize(contentText, contentLabel.TextSize, contentLabel.Font, rawX)
+      if bounds then
+        contentH = math.max(minContentH, bounds.Y)
+      end
+    else
+      contentH = math.max(minContentH, minContentH * CountExplicitLines(contentText))
+    end
+  elseif opts.hideWhenEmpty then
+    contentH = 0
+  end
+
+  local contentY = 10 + titleH + contentGap
+  local frameH
+  if opts.hideWhenEmpty and contentText == "" then
+    frameH = math.max(opts.emptyFrameHeight or minFrameH, 10 + titleH + 9, extraHeight)
+  else
+    frameH = math.max(minFrameH, contentY + contentH + 10, extraHeight)
+  end
+
+  local centerEmpty = (opts.centerTitleWhenEmpty and contentText == "" and titleH <= 13)
+  local titlePos = centerEmpty and UDim2.new(0, 10, 0.5, -7) or UDim2.new(0, 10, 0, 10)
+  local titleSize = UDim2.new(1, widthOffset, 0, titleH)
+  local contentPos = UDim2.new(0, 10, 0, contentY)
+  local contentSize = UDim2.new(1, widthOffset, 0, contentH)
+
+  local changed = (
+    titleLabel.Position ~= titlePos
+    or titleLabel.Size ~= titleSize
+    or contentLabel.Position ~= contentPos
+    or contentLabel.Size ~= contentSize
+    or itemFrame.Size.Y.Offset ~= frameH
+  )
+  if not changed then
     return false
   end
 
-  contentLabel.Size = UDim2.new(1, widthOffset, 0, targetHeight)
-  itemFrame.Size = UDim2.new(1, 0, 0, frameHeight)
+  titleLabel.Position = titlePos
+  titleLabel.Size = titleSize
+  contentLabel.Position = contentPos
+  contentLabel.Size = contentSize
+  itemFrame.Size = UDim2.new(1, 0, 0, frameH)
   return true
 end
 
@@ -1383,6 +1465,7 @@ function Speed_Library:CreateWindow(Config)
     Text = Title,
     TextColor3 = Color3.fromRGB(255, 255, 255),
     TextSize = 14,
+    TextWrapped = true,
     TextXAlignment = Enum.TextXAlignment.Left,
     BackgroundColor3 = Color3.fromRGB(18, 18, 18),
     BackgroundTransparency = 0.9990000128746033,
@@ -1407,6 +1490,7 @@ function Speed_Library:CreateWindow(Config)
     Text = Description,
     TextColor3 = Custom.ColorRGB,
     TextSize = 14,
+    TextWrapped = true,
     TextXAlignment = Enum.TextXAlignment.Left,
     BackgroundColor3 = Color3.fromRGB(18, 18, 18),
     BackgroundTransparency = 0.9990000128746033,
@@ -1626,15 +1710,44 @@ function Speed_Library:CreateWindow(Config)
     return currentScale
   end
 
-  local function bindItemResize(itemFrame, contentLabel, widthOffset, minHeight, onResized)
-    ResizeItemContent(itemFrame, contentLabel, widthOffset, minHeight, getReadyScale())
-    contentLabel:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+  local function bindItemResize(itemFrame, titleLabel, contentLabel, opts)
+    local lastWidth = 0
+    local wrappedOpts = {
+      widthOffset = opts.widthOffset,
+      minContentHeight = opts.minContentHeight,
+      contentGap = opts.contentGap,
+      minFrameHeight = opts.minFrameHeight,
+      emptyFrameHeight = opts.emptyFrameHeight,
+      hideWhenEmpty = opts.hideWhenEmpty,
+      centerTitleWhenEmpty = opts.centerTitleWhenEmpty,
+      onMeasuredWidth = function(w)
+        lastWidth = w
+      end
+    }
+
+    local function apply(useScale)
+      wrappedOpts.uiScale = useScale
+      wrappedOpts.fallbackWidth = lastWidth
+      wrappedOpts.extraHeight = opts.extraHeightFn and opts.extraHeightFn() or 0
+      return ResizeCardItem(itemFrame, titleLabel, contentLabel, wrappedOpts)
+    end
+
+    apply(getReadyScale())
+
+    titleLabel:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
       local scale = getReadyScale()
       if not scale then return end
-      if ResizeItemContent(itemFrame, contentLabel, widthOffset, minHeight, scale) then
-        onResized()
+      if apply(scale) and opts.onResized then
+        opts.onResized()
       end
     end)
+
+    return function()
+      local changed = apply(getReadyScale())
+      if changed and opts.onResized then
+        opts.onResized()
+      end
+    end
   end
 
   local function getMaxScroll(scrollFrame)
@@ -2161,23 +2274,25 @@ function Speed_Library:CreateWindow(Config)
       Text = _Name,
       TextColor3 = Color3.fromRGB(255, 255, 255),
       TextSize = 13,
+      TextWrapped = true,
       TextXAlignment = Enum.TextXAlignment.Left,
       BackgroundColor3 = Color3.fromRGB(18, 18, 18),
       BackgroundTransparency = 0.999,
       BorderColor3 = Color3.fromRGB(30, 30, 30),
       BorderSizePixel = 0,
-      Size = UDim2.new(1, 0, 1, 0),
+      Size = UDim2.new(1, -34, 1, 0),
       Position = UDim2.new(0, 30, 0, 0),
       Name = "TabName",
     }, Tab)
 
     Custom:Create("ImageLabel", {
       Image = Icon,
+      AnchorPoint = Vector2.new(0, 0.5),
       BackgroundColor3 = Color3.fromRGB(18, 18, 18),
       BackgroundTransparency = 0.999,
       BorderColor3 = Color3.fromRGB(30, 30, 30),
       BorderSizePixel = 0,
-      Position = UDim2.new(0, 9, 0, 7),
+      Position = UDim2.new(0, 9, 0.5, 0),
       Size = UDim2.new(0, 16, 0, 16),
       Name = "FeatureImg",
     }, Tab)
@@ -2320,15 +2435,16 @@ function Speed_Library:CreateWindow(Config)
         Text = Title,
         TextColor3 = Color3.fromRGB(230, 230, 230),
         TextSize = 13,
+        TextWrapped = true,
         TextXAlignment = Enum.TextXAlignment.Left,
-        TextYAlignment = Enum.TextYAlignment.Top,
+        TextYAlignment = Enum.TextYAlignment.Center,
         AnchorPoint = Vector2.new(0, 0.5),
         BackgroundColor3 = Color3.fromRGB(18, 18, 18),
         BackgroundTransparency = 0.9990000128746033,
         BorderColor3 = Color3.fromRGB(30, 30, 30),
         BorderSizePixel = 0,
         Position = UDim2.new(0, 10, 0.5, 0),
-        Size = UDim2.new(1, -50, 0, 13),
+        Size = UDim2.new(1, -38, 1, -4),
         Name = "SectionTitle"
       }, SectionReal)
   
@@ -2456,6 +2572,7 @@ function Speed_Library:CreateWindow(Config)
           Text = Title,
           TextColor3 = Color3.fromRGB(231, 231, 231),
           TextSize = 13,
+          TextWrapped = true,
           TextXAlignment = Enum.TextXAlignment.Left,
           TextYAlignment = Enum.TextYAlignment.Top,
           BackgroundColor3 = Color3.fromRGB(18, 18, 18),
@@ -2467,7 +2584,7 @@ function Speed_Library:CreateWindow(Config)
         }, Paragraph)
       
         local ParagraphContent = Custom:Create("TextLabel", {
-          Font = Enum.Font.GothamBold,
+          Font = Enum.Font.GothamSemibold,
           Text = Content,
           TextColor3 = Color3.fromRGB(255, 255, 255),
           TextSize = 12,
@@ -2482,55 +2599,14 @@ function Speed_Library:CreateWindow(Config)
           Name = "ParagraphContent",
         }, Paragraph)
 
-        local lastParagraphWidth = 0
-        local function UpdateParagraphSize()
-          local text = ParagraphContent.Text or ""
-          if text == "" then
-            ParagraphContent.Size = UDim2.new(1, -20, 0, 0)
-            Paragraph.Size = UDim2.new(1, 0, 0, 32)
-            UpdateSizeSection()
-            return
-          end
-
-          local scale = getReadyScale()
-          local sizeX = scale and (ParagraphContent.AbsoluteSize.X / scale) or lastParagraphWidth
-          if sizeX > 10 then
-            lastParagraphWidth = sizeX
-          end
-          local newY
-          if sizeX > 10 then
-            local ok, bounds = pcall(function()
-              return TextService:GetTextSize(text, ParagraphContent.TextSize, ParagraphContent.Font, Vector2.new(sizeX, 2000))
-            end)
-            if ok and bounds then
-              newY = math.max(14, bounds.Y)
-            end
-          end
-
-          if not newY then
-            local explicitLines = 1
-            for _ in string.gmatch(text, "\n") do
-              explicitLines += 1
-            end
-            newY = 14 * explicitLines
-          end
-
-          if ParagraphContent.Size.Y.Offset == newY and Paragraph.Size.Y.Offset == (newY + 36) then
-            return
-          end
-
-          ParagraphContent.Size = UDim2.new(1, -20, 0, newY)
-          Paragraph.Size = UDim2.new(1, 0, 0, newY + 36)
-          UpdateSizeSection()
-        end
-
-        UpdateParagraphSize()
-
-        ParagraphContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-          if getReadyScale() then
-            UpdateParagraphSize()
-          end
-        end)
+        local refreshParagraph = bindItemResize(Paragraph, ParagraphTitle, ParagraphContent, {
+          widthOffset = -20,
+          minContentHeight = 14,
+          contentGap = 3,
+          hideWhenEmpty = true,
+          emptyFrameHeight = 32,
+          onResized = UpdateSizeSection
+        })
 
         function SettingFuncs:Set(NewConfig)
           local NewTitle = NewConfig[1] or NewConfig.Title
@@ -2543,7 +2619,7 @@ function Speed_Library:CreateWindow(Config)
             ParagraphContent.Text = NewContent
           end
 
-          UpdateParagraphSize()
+          refreshParagraph()
         end
 
         ItemCount += 1
@@ -2649,12 +2725,13 @@ function Speed_Library:CreateWindow(Config)
           CornerRadius = UDim.new(0, 4)
         }, Button)
 
-        Custom:Create("TextLabel", {
+        local ButtonTitle = Custom:Create("TextLabel", {
 					Name = "ButtonTitle",
 					Font = Enum.Font.GothamBold,
 					Text = Title,
 					TextColor3 = Color3.fromRGB(231, 231, 231),
 					TextSize = 13,
+					TextWrapped = true,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					TextYAlignment = Enum.TextYAlignment.Top,
 					BackgroundColor3 = Color3.fromRGB(18, 18, 18),
@@ -2666,7 +2743,7 @@ function Speed_Library:CreateWindow(Config)
 
         local ButtonContent = Custom:Create("TextLabel", {
 					Name = "ButtonContent",
-					Font = Enum.Font.GothamBold,
+					Font = Enum.Font.GothamSemibold,
 					Text = Content,
 					TextColor3 = Color3.fromRGB(255, 255, 255),
 					TextSize = 12,
@@ -2681,7 +2758,12 @@ function Speed_Library:CreateWindow(Config)
 				}, Button)
 
         ButtonContent.TextWrapped = true
-        bindItemResize(Button, ButtonContent, -100, 12, UpdateSizeSection)
+        bindItemResize(Button, ButtonTitle, ButtonContent, {
+          widthOffset = -100,
+          minContentHeight = 12,
+          contentGap = 0,
+          onResized = UpdateSizeSection
+        })
 
         local ButtonButton = Custom:Create("TextButton", {
 					Name = "ButtonButton",
@@ -2752,6 +2834,7 @@ function Speed_Library:CreateWindow(Config)
 					Font = Enum.Font.GothamBold,
 					Text = Title,
 					TextSize = 13,
+					TextWrapped = true,
 					TextColor3 = Color3.fromRGB(231, 231, 231),
 					TextXAlignment = Enum.TextXAlignment.Left,
 					TextYAlignment = Enum.TextYAlignment.Top,
@@ -2764,7 +2847,7 @@ function Speed_Library:CreateWindow(Config)
 
         local ToggleContent = Custom:Create("TextLabel", {
 					Name = "ToggleContent",
-					Font = Enum.Font.GothamBold,
+					Font = Enum.Font.GothamSemibold,
 					Text = Content,
 					TextSize = 12,
 					TextColor3 = Color3.fromRGB(255, 255, 255),
@@ -2779,7 +2862,12 @@ function Speed_Library:CreateWindow(Config)
 				}, Toggle)
 				
         ToggleContent.TextWrapped = true
-        bindItemResize(Toggle, ToggleContent, -100, 12, UpdateSizeSection)
+        bindItemResize(Toggle, ToggleTitle, ToggleContent, {
+          widthOffset = -100,
+          minContentHeight = 12,
+          contentGap = 0,
+          onResized = UpdateSizeSection
+        })
 
         local ToggleButton = Custom:Create("TextButton", {
           Name = "ToggleButton",
@@ -2893,6 +2981,7 @@ function Speed_Library:CreateWindow(Config)
           Text = Title,
           TextColor3 = Color3.fromRGB(231, 231, 231),
           TextSize = 13,
+          TextWrapped = true,
           TextXAlignment = Enum.TextXAlignment.Left,
           TextYAlignment = Enum.TextYAlignment.Top,
           BackgroundColor3 = Color3.fromRGB(18, 18, 18),
@@ -2905,7 +2994,7 @@ function Speed_Library:CreateWindow(Config)
         }, Slider)
 
         local SliderContent = Custom:Create("TextLabel", {
-          Font = Enum.Font.GothamBold,
+          Font = Enum.Font.GothamSemibold,
           Text = Content,
           TextColor3 = Color3.fromRGB(255, 255, 255),
           TextSize = 12,
@@ -2922,47 +3011,17 @@ function Speed_Library:CreateWindow(Config)
           Name = "SliderContent",
         }, Slider)
 
-        local lastSliderWidth = 0
-        local function UpdateSliderSize()
-          if Content == "" then
-            SliderContent.Visible = false
-            SliderTitle.Position = UDim2.new(0, 10, 0.5, -7)
-            Slider.Size = UDim2.new(1, 0, 0, 42)
-            UpdateSizeSection()
-            return
-          end
-
-          local scale = getReadyScale()
-          local sizeX = scale and (SliderContent.AbsoluteSize.X / scale) or lastSliderWidth
-          if sizeX > 10 then
-            lastSliderWidth = sizeX
-          end
-          local contentHeight = 14
-          if sizeX > 10 then
-            local ok, bounds = pcall(function()
-              return TextService:GetTextSize(Content, SliderContent.TextSize, SliderContent.Font, Vector2.new(sizeX, 1000))
-            end)
-            if ok and bounds then
-              contentHeight = math.max(14, bounds.Y)
-            end
-          end
-
-          local targetHeight = math.max(48, contentHeight + 36)
-          if SliderContent.Size.Y.Offset == contentHeight and Slider.Size.Y.Offset == targetHeight then
-            return
-          end
-
-          SliderContent.Size = UDim2.new(1, -205, 0, contentHeight)
-          Slider.Size = UDim2.new(1, 0, 0, targetHeight)
-          UpdateSizeSection()
-        end
-
-        SliderContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-          if getReadyScale() then
-            UpdateSliderSize()
-          end
-        end)
-        UpdateSliderSize()
+        SliderContent.Visible = (Content ~= "")
+        bindItemResize(Slider, SliderTitle, SliderContent, {
+          widthOffset = -205,
+          minContentHeight = 14,
+          contentGap = 3,
+          hideWhenEmpty = true,
+          emptyFrameHeight = 42,
+          minFrameHeight = 48,
+          centerTitleWhenEmpty = true,
+          onResized = UpdateSizeSection
+        })
 
         local SliderInput = Custom:Create("Frame", {
           AnchorPoint = Vector2.new(1, 0.5),
@@ -2970,7 +3029,7 @@ function Speed_Library:CreateWindow(Config)
           BackgroundTransparency = 0.1,
           BorderSizePixel = 0,
           Position = UDim2.new(1, -10, 0.5, 0),
-          Size = UDim2.new(0, 44, 0, 22),
+          Size = UDim2.new(0, 48, 0, 22),
           Name = "SliderInput",
         }, Slider)
 
@@ -2985,10 +3044,10 @@ function Speed_Library:CreateWindow(Config)
         }, SliderInput)
 
         local TextBox = Custom:Create("TextBox", {
-          Font = Enum.Font.GothamBold,
+          Font = Enum.Font.RobotoMono,
           Text = tostring(Default),
           TextColor3 = Color3.fromRGB(242, 242, 246),
-          TextSize = 12,
+          TextSize = 13,
           TextXAlignment = Enum.TextXAlignment.Center,
           ClearTextOnFocus = false,
           BackgroundTransparency = 1,
@@ -3209,6 +3268,7 @@ function Speed_Library:CreateWindow(Config)
           Text = Title,
           TextColor3 = Color3.fromRGB(230, 230, 230),
           TextSize = 13,
+          TextWrapped = true,
           TextXAlignment = Enum.TextXAlignment.Left,
           TextYAlignment = Enum.TextYAlignment.Top,
           BackgroundColor3 = Color3.fromRGB(18, 18, 18),
@@ -3221,7 +3281,7 @@ function Speed_Library:CreateWindow(Config)
         }, Input)
 
         local InputContent = Custom:Create("TextLabel", {
-          Font = Enum.Font.GothamBold,
+          Font = Enum.Font.GothamSemibold,
           Text = Content,
           TextColor3 = Color3.fromRGB(255, 255, 255),
           TextSize = 12,
@@ -3239,7 +3299,12 @@ function Speed_Library:CreateWindow(Config)
           Parent = Input
         })
 
-        bindItemResize(Input, InputContent, -180, 12, UpdateSizeSection)
+        bindItemResize(Input, InputTitle, InputContent, {
+          widthOffset = -180,
+          minContentHeight = 12,
+          contentGap = 0,
+          onResized = UpdateSizeSection
+        })
 
         local InputFrame = Custom:Create("Frame", {
           AnchorPoint = Vector2.new(1, 0.5),
@@ -3335,6 +3400,7 @@ function Speed_Library:CreateWindow(Config)
           Text = Title,
           TextColor3 = Color3.fromRGB(230, 230, 230),
           TextSize = 13,
+          TextWrapped = true,
           TextXAlignment = Enum.TextXAlignment.Left,
           TextYAlignment = Enum.TextYAlignment.Top,
           BackgroundColor3 = Color3.fromRGB(18, 18, 18),
@@ -3348,7 +3414,7 @@ function Speed_Library:CreateWindow(Config)
         })
 
         local DropdownContent = Custom:Create("TextLabel", {
-          Font = Enum.Font.GothamBold,
+          Font = Enum.Font.GothamSemibold,
           Text = Content,
           TextColor3 = Color3.fromRGB(255, 255, 255),
           TextSize = 12,
@@ -3367,7 +3433,16 @@ function Speed_Library:CreateWindow(Config)
         })
         
         DropdownContent.TextWrapped = true
-        bindItemResize(Dropdown, DropdownContent, -180, 12, UpdateSizeSection)
+        local currentDropdownBoxHeight = 30
+        local refreshDropdownSize = bindItemResize(Dropdown, DropdownTitle, DropdownContent, {
+          widthOffset = -180,
+          minContentHeight = 12,
+          contentGap = 0,
+          extraHeightFn = function()
+            return currentDropdownBoxHeight + 14
+          end,
+          onResized = UpdateSizeSection
+        })
 
         local SelectOptionsFrame = Custom:Create("Frame", {
           AnchorPoint = Vector2.new(1, 0.5),
@@ -3400,13 +3475,14 @@ function Speed_Library:CreateWindow(Config)
         end)
 
         local OptionSelecting = Custom:Create("TextLabel", {
-          Font = Enum.Font.GothamBold,
+          Font = Enum.Font.GothamSemibold,
           Text = "",
           TextColor3 = Color3.fromRGB(255, 255, 255),
           TextSize = 12,
           TextTransparency = 0.6,
           TextWrapped = true,
           TextXAlignment = Enum.TextXAlignment.Left,
+          TextYAlignment = Enum.TextYAlignment.Center,
           AnchorPoint = Vector2.new(0, 0.5),
           BackgroundColor3 = Color3.fromRGB(18, 18, 18),
           BackgroundTransparency = 0.999,
@@ -3416,6 +3492,16 @@ function Speed_Library:CreateWindow(Config)
           Size = UDim2.new(1, -30, 1, -8),
           Name = "OptionSelecting",
         }, SelectOptionsFrame)
+
+        local function UpdateDropdownLayout()
+          local selBounds = MeasureTextSize(OptionSelecting.Text or "", OptionSelecting.TextSize, OptionSelecting.Font, 118)
+          local selH = selBounds and math.max(14, selBounds.Y) or 14
+          currentDropdownBoxHeight = math.max(30, selH + 12)
+          if SelectOptionsFrame.Size.Y.Offset ~= currentDropdownBoxHeight then
+            SelectOptionsFrame.Size = UDim2.new(0, 148, 0, currentDropdownBoxHeight)
+          end
+          refreshDropdownSize()
+        end
 
         local OptionImg = Custom:Create("ImageLabel", {
           Image = "rbxassetid://90200523188815",
@@ -3509,6 +3595,7 @@ function Speed_Library:CreateWindow(Config)
           DropCount = 0
           ScrollSelect.CanvasPosition = Vector2.new(0, 0)
           resetScrollState(ScrollSelect)
+          UpdateDropdownLayout()
           UpdateCanvasSize()
         end
         
@@ -3532,6 +3619,7 @@ function Speed_Library:CreateWindow(Config)
         
           local DropdownValueTable = table.concat(Funcs_Dropdown.Value, ", ")
           OptionSelecting.Text = DropdownValueTable ~= "" and DropdownValueTable or "Select Options"
+          UpdateDropdownLayout()
           Callback(Funcs_Dropdown.Value)
         end
 
@@ -3566,21 +3654,47 @@ function Speed_Library:CreateWindow(Config)
             Name = "OptionButton"
           }, Option)
   
-          Custom:Create("TextLabel", {
+          local OptionText = Custom:Create("TextLabel", {
             Font = Enum.Font.GothamBold,
             Text = OptionName,
             TextSize = 13,
+            TextWrapped = true,
             TextColor3 = Color3.fromRGB(230, 230, 230),
             TextXAlignment = Enum.TextXAlignment.Left,
-            TextYAlignment = Enum.TextYAlignment.Top,
+            TextYAlignment = Enum.TextYAlignment.Center,
             BackgroundColor3 = Color3.fromRGB(18, 18, 18),
             BackgroundTransparency = 0.999,
             BorderColor3 = Color3.fromRGB(30, 30, 30),
             BorderSizePixel = 0,
-            Position = UDim2.new(0, 8, 0, 8),
-            Size = UDim2.new(1, -100, 0, 13),
+            Position = UDim2.new(0, 8, 0, 0),
+            Size = UDim2.new(1, -14, 1, 0),
             Name = "OptionText"
           }, Option)
+
+          local lastOptWidth = 134
+          local function UpdateOptionSize()
+            local scale = getReadyScale()
+            local availW = scale and (OptionText.AbsoluteSize.X / scale) or lastOptWidth
+            if availW <= 10 then
+              availW = lastOptWidth
+            else
+              lastOptWidth = availW
+            end
+            local bounds = MeasureTextSize(OptionName, OptionText.TextSize, OptionText.Font, availW)
+            local textH = bounds and math.max(13, bounds.Y) or 13
+            local targetH = math.max(30, textH + 14)
+            if Option.Size.Y.Offset ~= targetH then
+              Option.Size = UDim2.new(1, 0, 0, targetH)
+              UpdateCanvasSize()
+            end
+          end
+
+          UpdateOptionSize()
+          OptionText:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+            if getReadyScale() then
+              UpdateOptionSize()
+            end
+          end)
   
           local ChooseFrame = Custom:Create("Frame", {
             AnchorPoint = Vector2.new(0, 0.5),

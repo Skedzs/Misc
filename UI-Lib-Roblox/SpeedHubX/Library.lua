@@ -3106,7 +3106,7 @@ function Speed_Library:CreateWindow(Config)
           BorderColor3 = Color3.fromRGB(30, 30, 30),
           BorderSizePixel = 0,
           Position = UDim2.new(0, 10, 0, 10),
-          Size = UDim2.new(1, -205, 0, 13),
+          Size = UDim2.new(1, -214, 0, 13),
           Name = "SliderTitle",
         }, Slider)
 
@@ -3124,13 +3124,13 @@ function Speed_Library:CreateWindow(Config)
           BorderColor3 = Color3.fromRGB(30, 30, 30),
           BorderSizePixel = 0,
           Position = UDim2.new(0, 10, 0, 26),
-          Size = UDim2.new(1, -205, 0, 14),
+          Size = UDim2.new(1, -214, 0, 14),
           Name = "SliderContent",
         }, Slider)
 
         SliderContent.Visible = (Content ~= "")
         bindItemResize(Slider, SliderTitle, SliderContent, {
-          widthOffset = -205,
+          widthOffset = -214,
           minContentHeight = 14,
           contentGap = 3,
           hideWhenEmpty = true,
@@ -3178,8 +3178,8 @@ function Speed_Library:CreateWindow(Config)
           AnchorPoint = Vector2.new(1, 0.5),
           BackgroundTransparency = 1,
           BorderSizePixel = 0,
-          Position = UDim2.new(1, -64, 0.5, 0),
-          Size = UDim2.new(0, 122, 0, 24),
+          Position = UDim2.new(1, -68, 0.5, 0),
+          Size = UDim2.new(0, 124, 0, 24),
           Name = "SliderHit",
         }, Slider)
 
@@ -3189,7 +3189,7 @@ function Speed_Library:CreateWindow(Config)
           BackgroundTransparency = 0.84,
           BorderSizePixel = 0,
           Position = UDim2.new(0.5, 0, 0.5, 0),
-          Size = UDim2.new(1, 0, 0, 5),
+          Size = UDim2.new(1, -16, 0, 5),
           Name = "SliderFrame",
         }, SliderHit)
 

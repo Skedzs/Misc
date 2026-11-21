@@ -3044,7 +3044,7 @@ function Speed_Library:CreateWindow(Config)
         }, SliderInput)
 
         local TextBox = Custom:Create("TextBox", {
-          Font = Enum.Font.RobotoMono,
+          Font = Enum.Font.GothamBold,
           Text = tostring(Default),
           TextColor3 = Color3.fromRGB(242, 242, 246),
           TextSize = 13,
